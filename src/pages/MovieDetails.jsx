@@ -207,6 +207,9 @@ export default function MovieDetails() {
                 </p>
               )}
 
+              {/* ── Single CTA: Download OR Request ── */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+
                 {/* Trailer link */}
                 {trailer && (
                   <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
