@@ -283,23 +283,6 @@ export default function SeriesDetails() {
                 </p>
               )}
 
-              {/* ── Single CTA: Download OR Request ── */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {qualityLinks ? (
-                  <DownloadButton qualityLinks={qualityLinks} />
-                ) : episodes.length > 0 ? (
-                  <button
-                    onClick={() => { const el = document.getElementById('episodes-section'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-                    className="btn-brand text-sm"
-                  >
-                    <FiTv size={13} /> Browse Episodes
-                  </button>
-                ) : (
-                  <button onClick={() => { setReqEpisode(null); setShowReq(true); }} className="btn-brand text-sm">
-                    <FiMessageSquare size={13} /> Request Series
-                  </button>
-                )}
-
                 {trailer && (
                   <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
                     className="btn-ghost glass border border-white/15 text-sm">
@@ -338,10 +321,14 @@ export default function SeriesDetails() {
               {episodes.length > 0 && <span className="flex items-center gap-1.5"><FiTv size={12} className="text-brand-400" /> {availableCount}/{episodes.length} episodes ready</span>}
             </div>
             {qualityLinks && (
-              <span className="flex items-center gap-1.5 text-sm text-brand-400/70">
-                <FiDownload size={12} className="text-brand-400" />
-                {Object.keys(qualityLinks).join(' · ')} available
-              </span>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(qualityLinks).map(([q, url]) => (
+                  <a key={q} href={url} target="_blank" rel="noreferrer noopener"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors">
+                    <FiDownload size={12} /> {q} <FiExternalLink size={10} className="opacity-60" />
+                  </a>
+                ))}
+              </div>
             )}
           </div>
         )}

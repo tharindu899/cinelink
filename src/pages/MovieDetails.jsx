@@ -207,16 +207,6 @@ export default function MovieDetails() {
                 </p>
               )}
 
-              {/* ── Single CTA: Download OR Request ── */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {qualityLinks ? (
-                  <DownloadButton qualityLinks={qualityLinks} />
-                ) : (
-                  <button onClick={() => setShowReq(true)} className="btn-brand text-sm">
-                    <FiMessageSquare size={13} /> Request Movie
-                  </button>
-                )}
-
                 {/* Trailer link */}
                 {trailer && (
                   <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
@@ -244,10 +234,10 @@ export default function MovieDetails() {
       {/* ── CONTENT BELOW HERO ── */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 space-y-14 mt-10">
 
-        {/* Firebase availability panel — info only, no duplicate download buttons */}
+        {/* Firebase availability panel */}
         {fbData && qualityLinks && (
-          <div className="glass rounded-2xl p-5 border-l-4 border-brand-500">
-            <div className="flex items-center gap-2 mb-3">
+          <div className="glass rounded-2xl p-5 border-l-4 border-brand-500 space-y-4">
+            <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-400 shadow shadow-green-400/60" />
               <p className="text-xs text-brand-400 font-mono uppercase tracking-wider">Available on CineLink</p>
             </div>
@@ -261,10 +251,21 @@ export default function MovieDetails() {
                   <span className="font-mono text-xs">{fbData.note}</span>
                 </span>
               )}
-              <span className="flex items-center gap-1.5 text-brand-400/70">
-                <FiDownload size={12} className="text-brand-400" />
-                {Object.keys(qualityLinks).join(' · ')} available
-              </span>
+            </div>
+
+            {/* Quality links */}
+            <div className="space-y-2">
+              <p className="text-xs text-white/30 font-mono uppercase tracking-wider">Available Qualities</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(qualityLinks).map(([q, url]) => (
+                  <a key={q} href={url} target="_blank" rel="noreferrer noopener"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors">
+                    <FiDownload size={12} />
+                    {q}
+                    <FiExternalLink size={10} className="opacity-60" />
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         )}
