@@ -5,13 +5,15 @@ import {
   FiSearch, FiPlus, FiEdit2, FiTrash2, FiSave,
   FiX, FiRefreshCw, FiFilm, FiTv,
   FiLogOut, FiList, FiMessageSquare, FiLink,
-  FiClock, FiCheckCircle, FiChevronDown, FiChevronUp
+  FiClock, FiCheckCircle, FiChevronDown, FiChevronUp,
+  FiLayers
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { searchMulti, posterUrl } from '../api/tmdb';
 import {
   saveEntry, deleteEntry, listenEntries,
   listenRequests, updateRequestStatus, deleteRequest,
+  saveEpisode, deleteEpisode, listenEpisodes,
 } from '../firebase/firestore';
 
 const TABS = [
@@ -31,6 +33,7 @@ export default function Admin() {
   const [requests,  setRequests]  = useState([]);
   const [showForm,  setShowForm]  = useState(false);
   const [editItem,  setEditItem]  = useState(null);
+  const [episodeMgr, setEpisodeMgr] = useState(null); // { seriesId, seriesTitle }
   const [searchQ,   setSearchQ]   = useState('');
   const [searchRes, setSearchRes] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -180,7 +183,7 @@ export default function Admin() {
           ))}
         </div>
 
-        {/* ── Movies / Series tab ──────────────────────────────────────── */}
+        {/* ── Movies / Series tab ── */}
         {(tab === 'movies' || tab === 'series') && (
           <div>
             <div className="glass rounded-2xl p-5 mb-6 border border-white/10">
@@ -239,14 +242,23 @@ export default function Admin() {
             ) : (
               <div className="space-y-3">
                 {currentList.map(entry => (
-                  <EntryRow key={entry.id} entry={entry} onEdit={openEdit} onDelete={handleDelete} />
+                  <EntryRow
+                    key={entry.id}
+                    entry={entry}
+                    onEdit={openEdit}
+                    onDelete={handleDelete}
+                    onManageEpisodes={entry.type === 'series'
+                      ? () => setEpisodeMgr({ seriesId: entry.id, seriesTitle: entry.name || entry.title })
+                      : null
+                    }
+                  />
                 ))}
               </div>
             )}
           </div>
         )}
 
-        {/* ── Requests tab ─────────────────────────────────────────────── */}
+        {/* ── Requests tab ── */}
         {tab === 'requests' && (
           <div className="space-y-3">
             {requests.length === 0 ? (
@@ -275,6 +287,14 @@ export default function Admin() {
           onClose={() => { setShowForm(false); setEditItem(null); }}
         />
       )}
+
+      {episodeMgr && (
+        <EpisodeManagerModal
+          seriesId={episodeMgr.seriesId}
+          seriesTitle={episodeMgr.seriesTitle}
+          onClose={() => setEpisodeMgr(null)}
+        />
+      )}
     </div>
   );
 }
@@ -282,7 +302,7 @@ export default function Admin() {
 // ─────────────────────────────────────────────────────────────────────────────
 // EntryRow
 // ─────────────────────────────────────────────────────────────────────────────
-function EntryRow({ entry, onEdit, onDelete }) {
+function EntryRow({ entry, onEdit, onDelete, onManageEpisodes }) {
   const poster = posterUrl(entry.poster_path, 'w92');
   const title  = entry.title || entry.name;
   const date   = entry.added_date?.toDate
@@ -303,9 +323,309 @@ function EntryRow({ entry, onEdit, onDelete }) {
           {entry.note        && <span className="ml-2 text-blue-400">· {entry.note}</span>}
         </p>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {onManageEpisodes && (
+          <button
+            onClick={onManageEpisodes}
+            className="btn-ghost py-1.5 px-2.5 text-amber-400 hover:text-amber-300 text-xs gap-1.5"
+            title="Manage Episodes"
+          >
+            <FiLayers size={13} />
+            <span className="hidden sm:inline">Episodes</span>
+          </button>
+        )}
         <button onClick={() => onEdit(entry)}   className="btn-ghost p-2 text-blue-400 hover:text-blue-300"><FiEdit2  size={14} /></button>
         <button onClick={() => onDelete(entry)} className="btn-ghost p-2 text-red-400  hover:text-red-300"><FiTrash2 size={14} /></button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EpisodeManagerModal
+// ─────────────────────────────────────────────────────────────────────────────
+function EpisodeManagerModal({ seriesId, seriesTitle, onClose }) {
+  const [episodes, setEpisodes] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({
+    season: 1, episode: 1, title: '', link: '', resolution: '', quality: '', note: ''
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    return listenEpisodes(seriesId, setEpisodes);
+  }, [seriesId]);
+
+  const notePreview = [form.resolution, form.quality, form.note.trim()].filter(Boolean).join(' · ');
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveEpisode(seriesId, form.season, form.episode, {
+        title:       form.title.trim() || null,
+        custom_link: form.link.trim()  || null,
+        note:        notePreview       || null,
+      });
+      toast.success(editingId ? 'Episode updated!' : 'Episode added!');
+      resetForm();
+    } catch (err) {
+      toast.error(`Failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetForm = () => {
+    setForm({ season: 1, episode: 1, title: '', link: '', resolution: '', quality: '', note: '' });
+    setEditingId(null);
+  };
+
+  const handleEdit = (ep) => {
+    const noteParts = (ep.note || '').split(' · ');
+    setEditingId(ep.id);
+    setForm({
+      season:     ep.season,
+      episode:    ep.episode,
+      title:      ep.title || '',
+      link:       ep.custom_link || '',
+      resolution: noteParts.find(p => RESOLUTIONS.includes(p)) || '',
+      quality:    noteParts.find(p => QUALITIES.includes(p))   || '',
+      note:       noteParts.filter(p => !RESOLUTIONS.includes(p) && !QUALITIES.includes(p)).join(' · '),
+    });
+  };
+
+  const handleDelete = async (ep) => {
+    const label = `S${String(ep.season).padStart(2,'0')}E${String(ep.episode).padStart(2,'0')}`;
+    if (!window.confirm(`Delete ${label}?`)) return;
+    try {
+      await deleteEpisode(seriesId, ep.id);
+      toast.success('Episode deleted.');
+      if (editingId === ep.id) resetForm();
+    } catch { toast.error('Delete failed.'); }
+  };
+
+  // Group by season
+  const seasonGroups = episodes.reduce((acc, ep) => {
+    if (!acc[ep.season]) acc[ep.season] = [];
+    acc[ep.season].push(ep);
+    return acc;
+  }, {});
+  const seasonNums = Object.keys(seasonGroups).map(Number).sort((a, b) => a - b);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative glass rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl shadow-black/60 animate-fade-up">
+
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
+          <div>
+            <h3 className="font-display text-2xl text-white tracking-wide">Manage Episodes</h3>
+            <p className="text-white/40 text-xs font-body mt-0.5 truncate max-w-xs">{seriesTitle}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/30 font-mono">{episodes.length} episodes</span>
+            <button onClick={onClose} className="btn-ghost p-1.5"><FiX size={16}/></button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+
+          {/* Add / Edit form */}
+          <div className="glass rounded-xl p-4 border border-white/10 space-y-4">
+            <p className="text-xs text-white/40 font-mono uppercase tracking-wider flex items-center gap-2">
+              {editingId
+                ? <><FiEdit2 size={11}/> Editing S{String(form.season).padStart(2,'0')}E{String(form.episode).padStart(2,'0')}</>
+                : <><FiPlus size={11}/> Add Episode</>
+              }
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-white/40 font-mono uppercase tracking-wider block mb-1.5">Season</label>
+                <input
+                  type="number" min="1"
+                  value={form.season}
+                  onChange={e => setForm(p => ({ ...p, season: Number(e.target.value) }))}
+                  className="input-dark"
+                  disabled={!!editingId}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/40 font-mono uppercase tracking-wider block mb-1.5">Episode</label>
+                <input
+                  type="number" min="1"
+                  value={form.episode}
+                  onChange={e => setForm(p => ({ ...p, episode: Number(e.target.value) }))}
+                  className="input-dark"
+                  disabled={!!editingId}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-white/40 font-mono uppercase tracking-wider block mb-1.5">
+                Episode Title <span className="normal-case">(optional)</span>
+              </label>
+              <input
+                type="text" value={form.title}
+                onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                placeholder="e.g. Winter is Coming"
+                className="input-dark"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-white/40 font-mono uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                <FiLink size={11}/> Watch Link
+              </label>
+              <input
+                type="text" value={form.link}
+                onChange={e => setForm(p => ({ ...p, link: e.target.value }))}
+                placeholder="https://t.me/... or any URL"
+                className="input-dark"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-white/40 font-mono uppercase tracking-wider block mb-2">Resolution</label>
+              <div className="flex flex-wrap gap-2">
+                {RESOLUTIONS.map(r => (
+                  <button key={r} type="button"
+                    onClick={() => setForm(p => ({ ...p, resolution: p.resolution === r ? '' : r }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
+                      form.resolution === r
+                        ? 'bg-brand-600 border-brand-500 text-white'
+                        : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
+                    }`}>{r}</button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-white/40 font-mono uppercase tracking-wider block mb-2">Quality / Source</label>
+              <div className="flex flex-wrap gap-2">
+                {QUALITIES.map(q => (
+                  <button key={q} type="button"
+                    onClick={() => setForm(p => ({ ...p, quality: p.quality === q ? '' : q }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
+                      form.quality === q
+                        ? 'bg-blue-600 border-blue-500 text-white'
+                        : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
+                    }`}>{q}</button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-white/40 font-mono uppercase tracking-wider block mb-1.5 flex items-center gap-1.5">
+                <FiMessageSquare size={11}/> Extra Note <span className="normal-case">(optional)</span>
+              </label>
+              <input
+                type="text" value={form.note}
+                onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
+                placeholder="e.g. English subtitles, Dual audio…"
+                className="input-dark"
+              />
+            </div>
+
+            {notePreview && (
+              <div className="rounded-lg bg-dark-700 border border-white/10 px-3 py-2 text-xs font-mono">
+                <span className="text-white/40">Note preview → </span>
+                <span className="text-white">{notePreview}</span>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              {editingId && (
+                <button type="button" onClick={resetForm} className="btn-ghost flex-1 justify-center">
+                  Cancel
+                </button>
+              )}
+              <button
+                type="button" onClick={handleSave} disabled={saving}
+                className="btn-brand flex-1 justify-center disabled:opacity-60"
+              >
+                {saving ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                    Saving…
+                  </span>
+                ) : editingId
+                  ? <><FiSave size={14}/> Update Episode</>
+                  : <><FiPlus size={14}/> Add Episode</>
+                }
+              </button>
+            </div>
+          </div>
+
+          {/* Existing episodes */}
+          {episodes.length === 0 ? (
+            <div className="text-center py-10 text-white/30">
+              <FiTv size={32} className="mx-auto mb-3 opacity-40" />
+              <p className="text-sm font-body">No episodes added yet.</p>
+              <p className="text-xs mt-1">Use the form above to add episode links.</p>
+            </div>
+          ) : (
+            seasonNums.map(season => (
+              <div key={season}>
+                <div className="flex items-center gap-2 mb-3">
+                  <FiTv size={13} className="text-brand-400" />
+                  <p className="text-xs text-white/40 font-mono uppercase tracking-wider">
+                    Season {season} · {seasonGroups[season].length} episode{seasonGroups[season].length > 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {seasonGroups[season].map(ep => {
+                    const label = `S${String(ep.season).padStart(2,'0')}E${String(ep.episode).padStart(2,'0')}`;
+                    const isEditing = editingId === ep.id;
+                    return (
+                      <div key={ep.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                          isEditing
+                            ? 'bg-brand-900/20 border-brand-500/30'
+                            : 'bg-dark-800 border-white/5 hover:border-white/10'
+                        }`}
+                      >
+                        <span className="font-mono text-xs text-brand-400 font-semibold flex-shrink-0 w-16">
+                          {label}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          {ep.title && (
+                            <p className="text-white text-xs font-body font-medium truncate">{ep.title}</p>
+                          )}
+                          {ep.note && (
+                            <p className="text-white/40 text-xs truncate">{ep.note}</p>
+                          )}
+                          {ep.custom_link && (
+                            <p className="text-brand-400 text-xs flex items-center gap-1 mt-0.5">
+                              <FiLink size={10}/> Has link
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => handleEdit(ep)}
+                            className={`btn-ghost p-1.5 ${isEditing ? 'text-brand-400' : 'text-blue-400 hover:text-blue-300'}`}
+                          >
+                            <FiEdit2 size={12}/>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(ep)}
+                            className="btn-ghost p-1.5 text-red-400 hover:text-red-300"
+                          >
+                            <FiTrash2 size={12}/>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
@@ -332,6 +652,11 @@ function RequestRow({ req, onAction, onDelete, onFulfillWithData }) {
     ? req.requested_at.toDate().toLocaleString()
     : '—';
 
+  const isEpisode = req.season != null && req.episode != null;
+  const epLabel   = isEpisode
+    ? `S${String(req.season).padStart(2,'0')}E${String(req.episode).padStart(2,'0')}`
+    : null;
+
   const handleFulfill = async () => {
     setSaving(true);
     await onFulfillWithData(req, link, note, resolution, quality);
@@ -343,20 +668,19 @@ function RequestRow({ req, onAction, onDelete, onFulfillWithData }) {
 
   return (
     <div className="glass rounded-2xl border border-white/5 overflow-hidden">
-
-      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4">
         {req.poster_path && (
           <img
             src={`https://image.tmdb.org/t/p/w92${req.poster_path}`}
-            alt=""
-            className="w-9 h-14 object-cover rounded flex-shrink-0"
+            alt="" className="w-9 h-14 object-cover rounded flex-shrink-0"
           />
         )}
-
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-body font-semibold text-sm">{req.title}</p>
+            {epLabel && (
+              <span className="font-mono text-xs text-brand-400 font-semibold">{epLabel}</span>
+            )}
             <span className={`text-xs px-2 py-0.5 rounded-full border capitalize ${statusColors[req.status] || statusColors.pending}`}>
               {req.status}
             </span>
@@ -366,8 +690,6 @@ function RequestRow({ req, onAction, onDelete, onFulfillWithData }) {
             <FiClock size={10} /> {date}
           </p>
         </div>
-
-        {/* Action buttons */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {req.status === 'pending' && (
             <>
@@ -386,7 +708,6 @@ function RequestRow({ req, onAction, onDelete, onFulfillWithData }) {
               </button>
             </>
           )}
-          {/* Delete — always visible */}
           <button
             onClick={() => onDelete(req)}
             className="btn-ghost p-2 text-red-500 hover:text-red-400"
@@ -397,93 +718,59 @@ function RequestRow({ req, onAction, onDelete, onFulfillWithData }) {
         </div>
       </div>
 
-      {/* ── Expandable fulfill form ── */}
       {expanded && req.status === 'pending' && (
         <div className="border-t border-white/10 bg-dark-800/50 p-4 space-y-5">
-
-          {/* Watch link */}
           <div className="space-y-1.5">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider flex items-center gap-1.5">
               <FiLink size={11} /> Watch Link
             </label>
             <input
-              type="text"
-              value={link}
-              onChange={e => setLink(e.target.value)}
+              type="text" value={link} onChange={e => setLink(e.target.value)}
               placeholder="https://t.me/... or any URL"
               className="input-dark"
             />
           </div>
-
-          {/* Resolution chips */}
           <div className="space-y-2">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider">Resolution</label>
             <div className="flex flex-wrap gap-2">
               {RESOLUTIONS.map(r => (
-                <button
-                  key={r} type="button"
-                  onClick={() => setResolution(p => p === r ? '' : r)}
+                <button key={r} type="button" onClick={() => setResolution(p => p === r ? '' : r)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
-                    resolution === r
-                      ? 'bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-900/40'
-                      : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
-                  }`}
-                >{r}</button>
+                    resolution === r ? 'bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-900/40' : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
+                  }`}>{r}</button>
               ))}
             </div>
           </div>
-
-          {/* Quality chips */}
           <div className="space-y-2">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider">Quality / Source</label>
             <div className="flex flex-wrap gap-2">
               {QUALITIES.map(q => (
-                <button
-                  key={q} type="button"
-                  onClick={() => setQuality(p => p === q ? '' : q)}
+                <button key={q} type="button" onClick={() => setQuality(p => p === q ? '' : q)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
-                    quality === q
-                      ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40'
-                      : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
-                  }`}
-                >{q}</button>
+                    quality === q ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40' : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
+                  }`}>{q}</button>
               ))}
             </div>
           </div>
-
-          {/* Extra note */}
           <div className="space-y-1.5">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider flex items-center gap-1.5">
               <FiMessageSquare size={11} /> Extra Note <span className="normal-case">(optional)</span>
             </label>
             <input
-              type="text"
-              value={note}
-              onChange={e => setNote(e.target.value)}
+              type="text" value={note} onChange={e => setNote(e.target.value)}
               placeholder="e.g. English subtitles, Dual audio…"
               className="input-dark"
             />
           </div>
-
-          {/* Note preview */}
           {notePreview && (
             <div className="rounded-lg bg-dark-700 border border-white/10 px-3 py-2 text-xs font-mono">
               <span className="text-white/40">Note preview → </span>
               <span className="text-white">{notePreview}</span>
             </div>
           )}
-
-          {/* Submit */}
           <div className="flex gap-3">
-            <button type="button" onClick={() => setExpanded(false)} className="btn-ghost flex-1 justify-center">
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleFulfill}
-              disabled={saving}
-              className="btn-brand flex-1 justify-center disabled:opacity-60"
-            >
+            <button type="button" onClick={() => setExpanded(false)} className="btn-ghost flex-1 justify-center">Cancel</button>
+            <button type="button" onClick={handleFulfill} disabled={saving} className="btn-brand flex-1 justify-center disabled:opacity-60">
               {saving ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -545,16 +832,11 @@ function EntryFormModal({ item, onClose }) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-
       <div className="relative glass rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/60 animate-fade-up overflow-y-auto max-h-[90vh]">
-        <button onClick={onClose} className="absolute top-4 right-4 btn-ghost p-1.5 rounded-lg">
-          <FiX size={16} />
-        </button>
+        <button onClick={onClose} className="absolute top-4 right-4 btn-ghost p-1.5 rounded-lg"><FiX size={16} /></button>
 
         <h3 className="font-display text-2xl text-white mb-5 tracking-wide pr-8">
           {fbData ? 'Edit Entry' : 'Add Entry'}
@@ -569,78 +851,54 @@ function EntryFormModal({ item, onClose }) {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
-          {/* Link */}
           <div className="space-y-1.5">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider flex items-center gap-1.5">
               <FiLink size={11} /> Watch Link
             </label>
-            <input
-              type="text"
-              value={link}
-              onChange={e => setLink(e.target.value)}
-              placeholder="https://t.me/... or any URL"
-              className="input-dark"
-            />
+            <input type="text" value={link} onChange={e => setLink(e.target.value)}
+              placeholder="https://t.me/... or any URL" className="input-dark" />
           </div>
-
-          {/* Resolution */}
           <div className="space-y-2">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider">Resolution</label>
             <div className="flex flex-wrap gap-2">
               {RESOLUTIONS.map(r => (
                 <button key={r} type="button" onClick={() => setResolution(p => p === r ? '' : r)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
-                    resolution === r
-                      ? 'bg-brand-600 border-brand-500 text-white'
-                      : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
+                    resolution === r ? 'bg-brand-600 border-brand-500 text-white' : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
                   }`}>{r}</button>
               ))}
             </div>
           </div>
-
-          {/* Quality */}
           <div className="space-y-2">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider">Quality / Source</label>
             <div className="flex flex-wrap gap-2">
               {QUALITIES.map(q => (
                 <button key={q} type="button" onClick={() => setQuality(p => p === q ? '' : q)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
-                    quality === q
-                      ? 'bg-blue-600 border-blue-500 text-white'
-                      : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
+                    quality === q ? 'bg-blue-600 border-blue-500 text-white' : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
                   }`}>{q}</button>
               ))}
             </div>
           </div>
-
-          {/* Extra note */}
           <div className="space-y-1.5">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider flex items-center gap-1.5">
               <FiMessageSquare size={11} /> Extra Note <span className="normal-case">(optional)</span>
             </label>
-            <input
-              type="text"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="e.g. English subtitles, Dual audio…"
-              className="input-dark"
-            />
+            <input type="text" value={note} onChange={e => setNote(e.target.value)}
+              placeholder="e.g. English subtitles, Dual audio…" className="input-dark" />
           </div>
-
-          {/* Preview */}
           {notePreview && (
             <div className="rounded-lg bg-dark-700 border border-white/10 px-3 py-2 text-xs font-mono">
               <span className="text-white/40">Note preview → </span>
               <span className="text-white">{notePreview}</span>
             </div>
           )}
-
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-ghost flex-1 justify-center">Cancel</button>
             <button type="submit" disabled={saving} className="btn-brand flex-1 justify-center disabled:opacity-60">
               {saving ? (
                 <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                   Saving…
                 </span>
               ) : <><FiSave size={14} /> Save</>}

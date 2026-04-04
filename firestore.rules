@@ -13,7 +13,7 @@ service cloud.firestore {
 
     // ── Movies collection ─────────────────────────────────────────────────
     match /movies/{movieId} {
-      allow read: if true;                  // everyone can read
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
@@ -21,12 +21,18 @@ service cloud.firestore {
     match /series/{seriesId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+
+      // Episodes subcollection
+      match /episodes/{episodeId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+      }
     }
 
     // ── Requests collection ───────────────────────────────────────────────
     match /requests/{requestId} {
-      allow read: if isAdmin();             // admin-only read
-      allow create: if true;               // anyone can submit a request
+      allow read: if isAdmin();
+      allow create: if true;
       allow update, delete: if isAdmin();
     }
   }

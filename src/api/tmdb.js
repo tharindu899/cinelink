@@ -62,3 +62,9 @@ export const getMovieGenres = () =>
 
 export const getTVGenres = () =>
   tmdb.get('/genre/tv/list').then(r => r.data.genres);
+
+// ── Person ────────────────────────────────────────────────────────────────────
+export const getPersonDetails = (id) =>
+  tmdb.get(`/person/${id}`, {
+    params: { append_to_response: 'movie_credits,tv_credits,images,external_ids' },
+  }).then(r => r.data);

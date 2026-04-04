@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import MovieDetails from './pages/MovieDetails';
 import SeriesDetails from './pages/SeriesDetails';
+import PersonDetails from './pages/PersonDetails';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
@@ -16,11 +17,12 @@ export default function App() {
       <Navbar />
       <main className="flex-1">
         <Routes>
-          <Route path="/"           element={<Home />} />
-          <Route path="/search"     element={<Search />} />
-          <Route path="/movie/:id"  element={<MovieDetails />} />
-          <Route path="/series/:id" element={<SeriesDetails />} />
-          <Route path="/login"      element={<Login />} />
+          <Route path="/"            element={<Home />} />
+          <Route path="/search"      element={<Search />} />
+          <Route path="/movie/:id"   element={<MovieDetails />} />
+          <Route path="/series/:id"  element={<SeriesDetails />} />
+          <Route path="/person/:id"  element={<PersonDetails />} />
+          <Route path="/login"       element={<Login />} />
           <Route
             path="/admin"
             element={
