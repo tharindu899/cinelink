@@ -1,0 +1,130 @@
+/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts are loaded in index.html ─────────────────────────────── */
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-dark-950 text-white font-body antialiased;
+    min-height: 100dvh;
+  }
+
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0d0f17; }
+  ::-webkit-scrollbar-thumb { background: #2e3255; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #ff3e33; }
+}
+
+@layer components {
+  /* ── Skeleton shimmer ─────────────────────────────────────────────────── */
+  .skeleton {
+    @apply rounded-lg;
+    background: linear-gradient(
+      90deg,
+      #131520 25%,
+      #1a1d2e 50%,
+      #131520 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* ── Glass card ──────────────────────────────────────────────────────── */
+  .glass {
+    background: rgba(19, 21, 32, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* ── Brand button ─────────────────────────────────────────────────────── */
+  .btn-brand {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl font-body font-semibold text-sm
+           bg-brand-600 hover:bg-brand-500 active:bg-brand-700
+           text-white transition-all duration-200
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-body font-medium text-sm
+           text-white/70 hover:text-white hover:bg-white/10 active:bg-white/5
+           transition-all duration-200
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20;
+  }
+
+  /* ── Input ───────────────────────────────────────────────────────────── */
+  .input-dark {
+    @apply w-full px-4 py-3 rounded-xl bg-dark-700 border border-white/10
+           text-white placeholder-white/30 font-body text-sm
+           focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30
+           transition-all duration-200;
+  }
+
+  /* ── Tag badge ───────────────────────────────────────────────────────── */
+  .tag {
+    @apply inline-flex items-center px-2.5 py-1 rounded-md text-xs font-body font-medium
+           bg-white/10 text-white/70;
+  }
+
+  .tag-brand {
+    @apply tag bg-brand-900/50 text-brand-300 border border-brand-800/50;
+  }
+
+  /* ── Rating badge ─────────────────────────────────────────────────────── */
+  .rating-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-semibold
+           bg-amber-500/20 text-amber-400 border border-amber-500/30;
+  }
+
+  /* ── Section heading ─────────────────────────────────────────────────── */
+  .section-title {
+    @apply font-display text-3xl tracking-wide text-white;
+  }
+}
+
+@layer utilities {
+  /* Line clamp (older browser fallback) */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* No scrollbar */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Gradient text */
+  .text-gradient {
+    background: linear-gradient(135deg, #ff6b61 0%, #ff3e33 50%, #c8150a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}

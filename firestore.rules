@@ -1,0 +1,33 @@
+// firestore.rules
+// Deploy with: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the requester the single admin?
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.token.email == 'REPLACE_WITH_YOUR_ADMIN_EMAIL';
+    }
+
+    // ── Movies collection ─────────────────────────────────────────────────
+    match /movies/{movieId} {
+      allow read: if true;                  // everyone can read
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Series collection ─────────────────────────────────────────────────
+    match /series/{seriesId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Requests collection ───────────────────────────────────────────────
+    match /requests/{requestId} {
+      allow read: if isAdmin();             // admin-only read
+      allow create: if true;               // anyone can submit a request
+      allow update, delete: if isAdmin();
+    }
+  }
+}
