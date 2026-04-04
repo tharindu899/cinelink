@@ -248,14 +248,6 @@ export default function SeriesDetails() {
           </div>
         )}
 
-        {/* Full overview */}
-        {show.overview && (
-          <section>
-            <h2 className="section-title mb-4">Overview</h2>
-            <p className="text-white/70 font-body text-sm leading-relaxed max-w-3xl">{show.overview}</p>
-          </section>
-        )}
-
         {/* Episodes */}
         {episodes.length > 0 && (
           <section>

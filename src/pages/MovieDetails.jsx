@@ -225,16 +225,6 @@ export default function MovieDetails() {
           </div>
         )}
 
-        {/* Full overview */}
-        {movie.overview && (
-          <section>
-            <h2 className="section-title mb-4">Overview</h2>
-            <p className="text-white/70 font-body text-sm leading-relaxed max-w-3xl">
-              {movie.overview}
-            </p>
-          </section>
-        )}
-
         {/* Stats grid */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
