@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import { searchMulti, posterUrl } from '../api/tmdb';
 import {
   saveEntry, deleteEntry, listenEntries,
-  listenRequests, updateRequestStatus,
+  listenRequests, updateRequestStatus, deleteRequest,
 } from '../firebase/firestore';
 
 const TABS = [
@@ -97,7 +97,14 @@ export default function Admin() {
     } catch { toast.error('Update failed.'); }
   };
 
-  // Fulfill request AND write to movies/series collection in one shot
+  const handleDeleteRequest = async (req) => {
+    if (!window.confirm(`Delete request for "${req.title}"?`)) return;
+    try {
+      await deleteRequest(req.id);
+      toast.success('Request deleted.');
+    } catch { toast.error('Delete failed.'); }
+  };
+
   const handleFulfillWithData = async (req, link, note, resolution, quality) => {
     try {
       const noteParts = [resolution, quality, note.trim()].filter(Boolean);
@@ -136,8 +143,8 @@ export default function Admin() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Movies',   value: movies.length,                                    icon: FiFilm,         color: 'text-brand-400' },
-            { label: 'Series',   value: series.length,                                    icon: FiTv,           color: 'text-blue-400'  },
+            { label: 'Movies',   value: movies.length,                                       icon: FiFilm,          color: 'text-brand-400' },
+            { label: 'Series',   value: series.length,                                       icon: FiTv,            color: 'text-blue-400'  },
             { label: 'Requests', value: requests.filter(r => r.status === 'pending').length, icon: FiMessageSquare, color: 'text-amber-400' },
           ].map(s => (
             <div key={s.label} className="glass rounded-2xl p-4 flex items-center gap-3">
@@ -253,6 +260,7 @@ export default function Admin() {
                   key={req.id}
                   req={req}
                   onAction={handleRequestAction}
+                  onDelete={handleDeleteRequest}
                   onFulfillWithData={handleFulfillWithData}
                 />
               ))
@@ -304,9 +312,9 @@ function EntryRow({ entry, onEdit, onDelete }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RequestRow  — tap to expand, pick resolution + quality, add link & note
+// RequestRow
 // ─────────────────────────────────────────────────────────────────────────────
-function RequestRow({ req, onAction, onFulfillWithData }) {
+function RequestRow({ req, onAction, onDelete, onFulfillWithData }) {
   const [expanded,   setExpanded]   = useState(false);
   const [link,       setLink]       = useState('');
   const [note,       setNote]       = useState('');
@@ -336,7 +344,7 @@ function RequestRow({ req, onAction, onFulfillWithData }) {
   return (
     <div className="glass rounded-2xl border border-white/5 overflow-hidden">
 
-      {/* ── Header row ── */}
+      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4">
         {req.poster_path && (
           <img
@@ -359,27 +367,37 @@ function RequestRow({ req, onAction, onFulfillWithData }) {
           </p>
         </div>
 
-        {/* Buttons */}
-        {req.status === 'pending' && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={() => setExpanded(p => !p)}
-              className={`btn-ghost py-1.5 px-3 text-xs gap-1.5 ${expanded ? 'text-brand-300' : 'text-brand-400'}`}
-            >
-              {expanded ? <FiChevronUp size={13} /> : <FiChevronDown size={13} />}
-              {expanded ? 'Close' : 'Add Link'}
-            </button>
-            <button
-              onClick={() => onAction(req, 'rejected')}
-              className="btn-ghost py-1.5 px-3 text-xs text-red-400 hover:text-red-300"
-            >
-              <FiX size={13} /> Reject
-            </button>
-          </div>
-        )}
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {req.status === 'pending' && (
+            <>
+              <button
+                onClick={() => setExpanded(p => !p)}
+                className={`btn-ghost py-1.5 px-3 text-xs gap-1.5 ${expanded ? 'text-brand-300' : 'text-brand-400'}`}
+              >
+                {expanded ? <FiChevronUp size={13} /> : <FiChevronDown size={13} />}
+                {expanded ? 'Close' : 'Add Link'}
+              </button>
+              <button
+                onClick={() => onAction(req, 'rejected')}
+                className="btn-ghost py-1.5 px-3 text-xs text-red-400 hover:text-red-300"
+              >
+                <FiX size={13} /> Reject
+              </button>
+            </>
+          )}
+          {/* Delete — always visible */}
+          <button
+            onClick={() => onDelete(req)}
+            className="btn-ghost p-2 text-red-500 hover:text-red-400"
+            title="Delete request"
+          >
+            <FiTrash2 size={14} />
+          </button>
+        </div>
       </div>
 
-      {/* ── Expandable form ── */}
+      {/* ── Expandable fulfill form ── */}
       {expanded && req.status === 'pending' && (
         <div className="border-t border-white/10 bg-dark-800/50 p-4 space-y-5">
 
@@ -403,38 +421,32 @@ function RequestRow({ req, onAction, onFulfillWithData }) {
             <div className="flex flex-wrap gap-2">
               {RESOLUTIONS.map(r => (
                 <button
-                  key={r}
-                  type="button"
+                  key={r} type="button"
                   onClick={() => setResolution(p => p === r ? '' : r)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
                     resolution === r
                       ? 'bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-900/40'
                       : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
                   }`}
-                >
-                  {r}
-                </button>
+                >{r}</button>
               ))}
             </div>
           </div>
 
-          {/* Quality / Source chips */}
+          {/* Quality chips */}
           <div className="space-y-2">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider">Quality / Source</label>
             <div className="flex flex-wrap gap-2">
               {QUALITIES.map(q => (
                 <button
-                  key={q}
-                  type="button"
+                  key={q} type="button"
                   onClick={() => setQuality(p => p === q ? '' : q)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
                     quality === q
                       ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40'
                       : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
                   }`}
-                >
-                  {q}
-                </button>
+                >{q}</button>
               ))}
             </div>
           </div>
@@ -453,7 +465,7 @@ function RequestRow({ req, onAction, onFulfillWithData }) {
             />
           </div>
 
-          {/* Live preview */}
+          {/* Note preview */}
           {notePreview && (
             <div className="rounded-lg bg-dark-700 border border-white/10 px-3 py-2 text-xs font-mono">
               <span className="text-white/40">Note preview → </span>
@@ -461,13 +473,9 @@ function RequestRow({ req, onAction, onFulfillWithData }) {
             </div>
           )}
 
-          {/* Actions */}
+          {/* Submit */}
           <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="btn-ghost flex-1 justify-center"
-            >
+            <button type="button" onClick={() => setExpanded(false)} className="btn-ghost flex-1 justify-center">
               Cancel
             </button>
             <button
@@ -481,9 +489,7 @@ function RequestRow({ req, onAction, onFulfillWithData }) {
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Saving…
                 </span>
-              ) : (
-                <><FiCheckCircle size={14} /> Fulfill & Save</>
-              )}
+              ) : <><FiCheckCircle size={14} /> Fulfill & Save</>}
             </button>
           </div>
         </div>
@@ -493,7 +499,7 @@ function RequestRow({ req, onAction, onFulfillWithData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EntryFormModal  — used when adding/editing from Movies or Series tab
+// EntryFormModal
 // ─────────────────────────────────────────────────────────────────────────────
 function EntryFormModal({ item, onClose }) {
   const { tmdbData, fbData, type } = item;
@@ -506,7 +512,6 @@ function EntryFormModal({ item, onClose }) {
   const [quality,    setQuality]    = useState('');
   const [saving,     setSaving]     = useState(false);
 
-  // Parse existing note into chips on open
   useEffect(() => {
     if (fbData?.note) {
       const parts = fbData.note.split(' · ');
@@ -555,7 +560,6 @@ function EntryFormModal({ item, onClose }) {
           {fbData ? 'Edit Entry' : 'Add Entry'}
         </h3>
 
-        {/* Item preview */}
         <div className="flex items-center gap-3 p-3 rounded-xl bg-dark-700 border border-white/10 mb-6">
           {poster && <img src={poster} alt={title} className="w-12 h-16 object-cover rounded-lg flex-shrink-0" />}
           <div>
@@ -584,15 +588,12 @@ function EntryFormModal({ item, onClose }) {
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider">Resolution</label>
             <div className="flex flex-wrap gap-2">
               {RESOLUTIONS.map(r => (
-                <button
-                  key={r} type="button"
-                  onClick={() => setResolution(p => p === r ? '' : r)}
+                <button key={r} type="button" onClick={() => setResolution(p => p === r ? '' : r)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
                     resolution === r
                       ? 'bg-brand-600 border-brand-500 text-white'
                       : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
-                  }`}
-                >{r}</button>
+                  }`}>{r}</button>
               ))}
             </div>
           </div>
@@ -602,15 +603,12 @@ function EntryFormModal({ item, onClose }) {
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider">Quality / Source</label>
             <div className="flex flex-wrap gap-2">
               {QUALITIES.map(q => (
-                <button
-                  key={q} type="button"
-                  onClick={() => setQuality(p => p === q ? '' : q)}
+                <button key={q} type="button" onClick={() => setQuality(p => p === q ? '' : q)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
                     quality === q
                       ? 'bg-blue-600 border-blue-500 text-white'
                       : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
-                  }`}
-                >{q}</button>
+                  }`}>{q}</button>
               ))}
             </div>
           </div>
