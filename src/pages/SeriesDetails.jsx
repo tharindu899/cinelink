@@ -283,6 +283,9 @@ export default function SeriesDetails() {
                 </p>
               )}
 
+              {/* ── Single CTA: Download OR Request ── */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+
                 {trailer && (
                   <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
                     className="btn-ghost glass border border-white/15 text-sm">
