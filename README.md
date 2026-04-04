@@ -83,7 +83,7 @@ cinelink/
 ### 1. Clone & install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/cinelink.git
+git clone https://github.com/tharindu899/cinelink.git
 cd cinelink
 npm install
 ```
