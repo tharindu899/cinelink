@@ -372,7 +372,8 @@ function EntryFormModal({ item, onClose }) {
       onClose();
     } catch (err) {
       console.error(err);
-      toast.error('Save failed. Check console.');
+      // FIX: show real error code so you can diagnose (e.g. permission-denied = Firestore rules issue)
+      toast.error(`Save failed: ${err?.code || err?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -406,13 +407,13 @@ function EntryFormModal({ item, onClose }) {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
-          {/* Custom link */}
+          {/* Custom link — FIX: changed type="url" to type="text" to avoid browser URL validation blocking submit */}
           <div className="space-y-1.5">
             <label className="text-xs text-white/50 font-mono uppercase tracking-wider flex items-center gap-1.5">
               <FiLink size={11} /> Custom Link (Telegram / URL)
             </label>
             <input
-              type="url"
+              type="text"
               value={link}
               onChange={e => setLink(e.target.value)}
               placeholder="https://t.me/... or any URL"
