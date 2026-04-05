@@ -67,6 +67,25 @@ function DownloadButton({ qualityLinks }) {
   );
 }
 
+function QualityBadges({ qualityLinks }) {
+  if (!qualityLinks) return null;
+
+  const qualities = Object.keys(qualityLinks);
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {qualities.map(q => (
+        <span
+          key={q}
+          className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-green-900/40 text-green-400 border border-green-700/40"
+        >
+          {q}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Watchlist helper (localStorage) ───────────────────────────────────────────
 function useWatchlist(id, type = 'movie') {
   const key = `watchlist_${type}_${id}`;
@@ -179,6 +198,7 @@ export default function MovieDetails() {
 
               <h1 className="font-display text-3xl sm:text-5xl md:text-6xl text-white leading-[0.95] tracking-wide">
                 {movie.title}
+                {qualityLinks && <QualityBadges qualityLinks={qualityLinks} />}
               </h1>
 
               {movie.tagline && (
@@ -208,34 +228,29 @@ export default function MovieDetails() {
               )}
 
               {/* ── Single CTA: Download OR Request ── */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {qualityLinks ? (
-                  <DownloadButton qualityLinks={qualityLinks} />
-                ) : (
-                  <button onClick={() => setShowReq(true)} className="btn-brand text-sm">
-                    <FiMessageSquare size={13} /> Request Movie
-                  </button>
-                )}
-
-                {/* Trailer link */}
-                {trailer && (
-                  <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
-                    className="btn-ghost glass border border-white/15 text-sm">
-                    <FiPlay size={12}/> Trailer
-                  </a>
-                )}
-
-                {/* Watchlist heart */}
-                <button
-                  onClick={toggleSaved}
-                  className={`btn-ghost p-2.5 rounded-xl border transition-all duration-200 ${
-                    saved ? 'border-red-500/50 text-red-400 bg-red-900/20' : 'border-white/10 text-white/40 hover:text-white'
-                  }`}
-                  title={saved ? 'Remove from watchlist' : 'Add to watchlist'}
-                >
-                  <FiHeart size={16} className={saved ? 'fill-red-400' : ''} />
+             <div className="flex flex-wrap items-center gap-3 pt-1">
+              {!qualityLinks && (
+                <button onClick={() => setShowReq(true)} className="btn-brand text-sm">
+                  <FiMessageSquare size={13} /> Request Movie
                 </button>
-              </div>
+              )}
+            
+              {trailer && (
+                <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
+                  className="btn-ghost glass border border-white/15 text-sm">
+                  <FiPlay size={12}/> Trailer
+                </a>
+              )}
+            
+              <button
+                onClick={toggleSaved}
+                className={`btn-ghost p-2.5 rounded-xl border ${
+                  saved ? 'border-red-500/50 text-red-400 bg-red-900/20' : 'border-white/10 text-white/40 hover:text-white'
+                }`}
+              >
+                <FiHeart size={16} className={saved ? 'fill-red-400' : ''} />
+              </button>
+            </div>
             </div>
           </div>
         </div>
