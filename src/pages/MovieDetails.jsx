@@ -209,6 +209,13 @@ export default function MovieDetails() {
 
               {/* ── Single CTA: Download OR Request ── */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
+                {qualityLinks ? (
+                  <DownloadButton qualityLinks={qualityLinks} />
+                ) : (
+                  <button onClick={() => setShowReq(true)} className="btn-brand text-sm">
+                    <FiMessageSquare size={13} /> Request Movie
+                  </button>
+                )}
 
                 {/* Trailer link */}
                 {trailer && (

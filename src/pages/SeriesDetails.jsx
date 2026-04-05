@@ -285,6 +285,20 @@ export default function SeriesDetails() {
 
               {/* ── Single CTA: Download OR Request ── */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
+                {qualityLinks ? (
+                  <DownloadButton qualityLinks={qualityLinks} />
+                ) : episodes.length > 0 ? (
+                  <button
+                    onClick={() => { const el = document.getElementById('episodes-section'); el?.scrollIntoView({ behavior: 'smooth' }); }}
+                    className="btn-brand text-sm"
+                  >
+                    <FiTv size={13} /> Browse Episodes
+                  </button>
+                ) : (
+                  <button onClick={() => { setReqEpisode(null); setShowReq(true); }} className="btn-brand text-sm">
+                    <FiMessageSquare size={13} /> Request Series
+                  </button>
+                )}
 
                 {trailer && (
                   <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
