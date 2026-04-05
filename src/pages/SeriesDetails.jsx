@@ -62,6 +62,25 @@ function DownloadButton({ qualityLinks, size = 'sm' }) {
   );
 }
 
+function QualityBadges({ qualityLinks }) {
+  if (!qualityLinks) return null;
+
+  const qualities = Object.keys(qualityLinks);
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {qualities.map(q => (
+        <span
+          key={q}
+          className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-green-900/40 text-green-400 border border-green-700/40"
+        >
+          {q}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Episode quality download (inline / compact) ───────────────────────────────
 function EpisodeDownloadLinks({ qualityLinks }) {
   const keys = Object.keys(qualityLinks);
@@ -234,16 +253,22 @@ export default function SeriesDetails() {
             <div className="flex-1 min-w-0 space-y-3 sm:space-y-4 pt-1 sm:pt-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="tag-brand text-xs">📺 SERIES</span>
-                {(qualityLinks || episodes.length > 0) && (
+                {(qualityLinks || episodes.length > 0) ? (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-green-900/40 text-green-400 border border-green-700/40">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                     Available
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-gray-800/60 text-gray-400 border border-gray-600/40">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                    Not Available
                   </span>
                 )}
               </div>
 
               <h1 className="font-display text-3xl sm:text-5xl md:text-6xl text-white leading-[0.95] tracking-wide">
                 {show.name}
+                {qualityLinks && <QualityBadges qualityLinks={qualityLinks} />}
               </h1>
 
               {show.tagline && (
@@ -284,29 +309,35 @@ export default function SeriesDetails() {
               )}
 
               {/* ── Single CTA: Download OR Request ── */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {qualityLinks ? (
-                  <DownloadButton qualityLinks={qualityLinks} />
-                ) : episodes.length > 0 ? (
-                  <button
-                    onClick={() => { const el = document.getElementById('episodes-section'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-                    className="btn-brand text-sm"
-                  >
-                    <FiTv size={13} /> Browse Episodes
-                  </button>
-                ) : (
-                  <button onClick={() => { setReqEpisode(null); setShowReq(true); }} className="btn-brand text-sm">
-                    <FiMessageSquare size={13} /> Request Series
-                  </button>
-                )}
-
-                {trailer && (
-                  <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
-                    className="btn-ghost glass border border-white/15 text-sm">
-                    <FiPlay size={12}/> Trailer
-                  </a>
-                )}
-
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  {!qualityLinks && episodes.length === 0 && (
+                    <button
+                      onClick={() => { setReqEpisode(null); setShowReq(true); }}
+                      className="btn-brand text-sm"
+                    >
+                      <FiMessageSquare size={13} /> Request Series
+                    </button>
+                  )}
+                
+                  {!qualityLinks && episodes.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const el = document.getElementById('episodes-section');
+                        el?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="btn-brand text-sm"
+                    >
+                      <FiTv size={13} /> Browse Episodes
+                    </button>
+                  )}
+                
+                  {trailer && (
+                    <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
+                      className="btn-ghost glass border border-white/15 text-sm">
+                      <FiPlay size={12}/> Trailer
+                    </a>
+                  )}
+                  
                 <button
                   onClick={toggleSaved}
                   className={`btn-ghost p-2.5 rounded-xl border transition-all duration-200 ${
