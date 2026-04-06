@@ -4,63 +4,154 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   FiStar, FiCalendar, FiExternalLink,
   FiMessageSquare, FiAlertCircle, FiDownload,
-  FiTv, FiArrowLeft, FiHeart, FiPlay,
+  FiTv, FiArrowLeft, FiHeart, FiPlay, FiClock,
 } from 'react-icons/fi';
-import { getTVDetails, backdropUrl, posterUrl } from '../api/tmdb';
-// ✅ FIX 3: Use real-time listeners instead of one-time fetches
+import { getTVDetails, getTVSeason, backdropUrl, posterUrl, stillUrl } from '../api/tmdb';
 import { listenEntry, listenEpisodes } from '../firebase/firestore';
 import CastCard from '../components/CastCard';
 import MovieCard from '../components/MovieCard';
 import RequestModal from '../components/RequestModal';
 import { DetailsSkeleton } from '../components/LoadingSpinner';
 
-// ── Helper: get quality→url map from fbData ───────────────────────────────────
+// ── Parse "YYYY-MM-DD" as LOCAL midnight (avoids UTC timezone shift) ──────────
+function parseLocalDate(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// ── Live countdown clock ──────────────────────────────────────────────────────
+function CountdownTimer({ airDate }) {
+  const tick = () => {
+    const diff = parseLocalDate(airDate) - Date.now();
+    if (diff <= 0) return null;
+    return {
+      days:    Math.floor(diff / 86400000),
+      hours:   Math.floor((diff % 86400000) / 3600000),
+      minutes: Math.floor((diff % 3600000)  / 60000),
+      seconds: Math.floor((diff % 60000)    / 1000),
+    };
+  };
+
+  const [t, setT] = useState(tick);
+
+  useEffect(() => {
+    const id = setInterval(() => setT(tick()), 1000);
+    return () => clearInterval(id);
+  }, [airDate]); // eslint-disable-line
+
+  /* Already airing today */
+  if (!t) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                       bg-green-900/40 text-green-400 text-xs font-mono font-semibold
+                       border border-green-700/40">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+        Airing Today
+      </span>
+    );
+  }
+
+  const units = [
+    { label: 'DAYS', value: t.days    },
+    { label: 'HRS',  value: t.hours   },
+    { label: 'MIN',  value: t.minutes },
+    { label: 'SEC',  value: t.seconds },
+  ];
+
+  return (
+    <div className="flex items-end gap-1">
+      {units.map(({ label, value }, i) => (
+        <div key={label} className="flex items-end gap-1">
+          {/* digit box */}
+          <div className="flex flex-col items-center">
+            <div className="w-11 h-11 rounded-xl bg-dark-900 border border-white/10
+                            flex items-center justify-center relative overflow-hidden
+                            shadow-inner shadow-black/50">
+              <div className="absolute inset-x-0 top-0 h-px bg-white/8" />
+              <div className="absolute inset-x-0 bottom-0 h-px bg-black/30" />
+              <span className="font-mono font-bold text-lg text-white relative z-10 tabular-nums">
+                {String(value).padStart(2, '0')}
+              </span>
+            </div>
+            <span className="text-white/25 text-[8px] font-mono tracking-widest mt-1">{label}</span>
+          </div>
+          {/* colon separator */}
+          {i < units.length - 1 && (
+            <span className="text-brand-500/70 font-mono font-bold text-base mb-[18px] leading-none">:</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Upcoming episode row ──────────────────────────────────────────────────────
+function UpcomingEpisodeRow({ ep, isNext }) {
+  const label = `S${String(ep.season_number).padStart(2,'0')} E${String(ep.episode_number).padStart(2,'0')}`;
+  const still = stillUrl(ep.still_path, 'w300');
+  const airFormatted = parseLocalDate(ep.air_date).toLocaleDateString('en-US', {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+  });
+
+  return (
+    <div className={`flex flex-col sm:flex-row gap-4 p-4 rounded-2xl border transition-colors ${
+      isNext ? 'bg-brand-950/60 border-brand-500/25' : 'bg-dark-800/40 border-white/5'
+    }`}>
+      {/* Still image */}
+      <div className="flex-shrink-0 w-full sm:w-40 h-24 sm:h-[4.5rem] rounded-xl overflow-hidden bg-dark-700 border border-white/5">
+        {still
+          ? <img src={still} alt={ep.name} className="w-full h-full object-cover" loading="lazy" />
+          : <div className="w-full h-full flex items-center justify-center text-white/15"><FiTv size={22} /></div>
+        }
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0 flex flex-col justify-between gap-1.5">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="font-mono text-xs font-semibold text-brand-400">{label}</span>
+            {isNext && (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold
+                               bg-brand-600 text-white tracking-wide">NEXT UP</span>
+            )}
+            {ep.runtime > 0 && (
+              <span className="flex items-center gap-1 text-white/30 text-[11px] font-body">
+                <FiClock size={9} /> {ep.runtime}m
+              </span>
+            )}
+          </div>
+          <p className="text-white font-body font-semibold text-sm line-clamp-1">
+            {ep.name || `Episode ${ep.episode_number}`}
+          </p>
+          {ep.overview && (
+            <p className="text-white/35 text-xs font-body mt-0.5 line-clamp-2 leading-relaxed hidden sm:block">
+              {ep.overview}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-white/40 text-[11px] font-body">
+          <FiCalendar size={10} className="text-brand-400/60" />
+          {airFormatted}
+        </div>
+      </div>
+
+      {/* Countdown */}
+      <div className="flex-shrink-0 flex items-center sm:items-end">
+        <CountdownTimer airDate={ep.air_date} />
+      </div>
+    </div>
+  );
+}
+
+// ── Helper: quality link map ──────────────────────────────────────────────────
 function getQualityLinks(data) {
   if (!data) return null;
   if (data.links && typeof data.links === 'object') {
-    const filtered = Object.fromEntries(Object.entries(data.links).filter(([, v]) => v));
-    if (Object.keys(filtered).length > 0) return filtered;
+    const f = Object.fromEntries(Object.entries(data.links).filter(([, v]) => v));
+    if (Object.keys(f).length > 0) return f;
   }
   if (data.custom_link) return { HD: data.custom_link };
   return null;
-}
-
-// ── Quality Download Button ────────────────────────────────────────────────────
-function DownloadButton({ qualityLinks, size = 'sm' }) {
-  const keys = Object.keys(qualityLinks);
-  const [selected, setSelected] = useState(keys[0]);
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {keys.length > 1 && (
-        <div className="flex flex-wrap gap-1.5">
-          {keys.map(q => (
-            <button
-              key={q}
-              onClick={() => setSelected(q)}
-              className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition-all duration-150 ${
-                selected === q
-                  ? 'bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-900/40'
-                  : 'bg-dark-700/80 border-white/15 text-white/60 hover:text-white hover:border-white/30'
-              }`}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      )}
-      <a
-        href={qualityLinks[selected]}
-        target="_blank"
-        rel="noreferrer noopener"
-        className="btn-brand text-sm"
-      >
-        <FiDownload size={13} />
-        Download · {selected}
-        <FiExternalLink size={11} />
-      </a>
-    </div>
-  );
 }
 
 function QualityBadges({ qualityLinks }) {
@@ -68,51 +159,39 @@ function QualityBadges({ qualityLinks }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {Object.keys(qualityLinks).map(q => (
-        <span
-          key={q}
-          className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-green-900/40 text-green-400 border border-green-700/40"
-        >
-          {q}
-        </span>
+        <span key={q} className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold
+                                  bg-green-900/40 text-green-400 border border-green-700/40">{q}</span>
       ))}
     </div>
   );
 }
 
-// ── Episode quality download (inline / compact) ───────────────────────────────
 function EpisodeDownloadLinks({ qualityLinks }) {
   const keys = Object.keys(qualityLinks);
   const [selected, setSelected] = useState(keys[0]);
-
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {keys.length > 1 && keys.map(q => (
-        <button
-          key={q}
-          onClick={() => setSelected(q)}
+        <button key={q} onClick={() => setSelected(q)}
           className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all ${
             selected === q
               ? 'bg-brand-600 border-brand-500 text-white'
               : 'bg-dark-700 border-white/10 text-white/50 hover:text-white hover:border-white/30'
-          }`}
-        >
-          {q}
-        </button>
+          }`}>{q}</button>
       ))}
       <a href={qualityLinks[selected]} target="_blank" rel="noreferrer noopener"
-        className="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+        className="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-500
+                   text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
         <FiDownload size={10} /> Download <FiExternalLink size={9} />
       </a>
     </div>
   );
 }
 
-// ── Episode Card ──────────────────────────────────────────────────────────────
 function EpisodeCard({ ep, onRequestEpisode }) {
   const label = `S${String(ep.season).padStart(2,'0')} E${String(ep.episode).padStart(2,'0')}`;
   const qualityLinks = getQualityLinks(ep);
   const hasLink = !!qualityLinks;
-
   return (
     <div className={`glass rounded-xl p-4 border transition-all duration-200 ${
       hasLink ? 'border-brand-500/30 hover:border-brand-500/60' : 'border-white/5 hover:border-white/10'
@@ -123,63 +202,68 @@ function EpisodeCard({ ep, onRequestEpisode }) {
       </div>
       {ep.title && <p className="text-white text-sm font-body font-medium leading-snug mb-2 line-clamp-2">{ep.title}</p>}
       {ep.note  && <p className="text-white/40 text-xs font-mono mb-3 truncate">{ep.note}</p>}
-
-      {hasLink ? (
-        <EpisodeDownloadLinks qualityLinks={qualityLinks} />
-      ) : (
-        <button onClick={onRequestEpisode}
-          className="inline-flex items-center gap-1.5 bg-dark-600 hover:bg-dark-500 text-white/60 hover:text-white text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20 transition-all">
-          <FiMessageSquare size={10} /> Request
-        </button>
-      )}
+      {hasLink
+        ? <EpisodeDownloadLinks qualityLinks={qualityLinks} />
+        : <button onClick={onRequestEpisode}
+            className="inline-flex items-center gap-1.5 bg-dark-600 hover:bg-dark-500
+                       text-white/60 hover:text-white text-xs px-3 py-1.5 rounded-lg
+                       border border-white/10 hover:border-white/20 transition-all">
+            <FiMessageSquare size={10} /> Request
+          </button>
+      }
     </div>
   );
 }
 
-// ── Watchlist helper ──────────────────────────────────────────────────────────
 function useWatchlist(id, type = 'series') {
   const key = `watchlist_${type}_${id}`;
   const [saved, setSaved] = useState(() => !!localStorage.getItem(key));
-  const toggle = () => {
-    if (saved) localStorage.removeItem(key);
-    else localStorage.setItem(key, '1');
-    setSaved(p => !p);
-  };
+  const toggle = () => { if (saved) localStorage.removeItem(key); else localStorage.setItem(key, '1'); setSaved(p => !p); };
   return [saved, toggle];
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function SeriesDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [show,       setShow]       = useState(null);
-  const [fbData,     setFbData]     = useState(null);
-  const [episodes,   setEpisodes]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [showReq,    setShowReq]    = useState(false);
-  const [reqEpisode, setReqEpisode] = useState(null);
-  const [saved, toggleSaved]        = useWatchlist(id, 'series');
+  const [show,        setShow]        = useState(null);
+  const [fbData,      setFbData]      = useState(null);
+  const [episodes,    setEpisodes]    = useState([]);
+  const [upcomingEps, setUpcomingEps] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [showReq,     setShowReq]     = useState(false);
+  const [reqEpisode,  setReqEpisode]  = useState(null);
+  const [saved, toggleSaved]          = useWatchlist(id, 'series');
 
-  // ✅ FIX 3: Real-time listeners — deleted links/episodes reflect immediately
+  /* Real-time Firestore + one-time TMDb fetch */
   useEffect(() => {
     setLoading(true);
-    setShow(null);
-    setFbData(null);
-    setEpisodes([]);
+    setShow(null); setFbData(null); setEpisodes([]); setUpcomingEps([]);
 
-    // TMDb is a one-time fetch (external API, no real-time needed)
-    getTVDetails(id)
-      .then(setShow)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    getTVDetails(id).then(setShow).catch(console.error).finally(() => setLoading(false));
 
-    // Firestore uses real-time listeners so changes (add/edit/delete) are live
     const unsubFb = listenEntry('series', id, setFbData);
     const unsubEp = listenEpisodes(id, setEpisodes);
-
     window.scrollTo(0, 0);
     return () => { unsubFb(); unsubEp(); };
   }, [id]);
+
+  /* Fetch upcoming episodes from TMDb season data once show is loaded */
+  useEffect(() => {
+    if (!show?.next_episode_to_air) { setUpcomingEps([]); return; }
+    const seasonNum = show.next_episode_to_air.season_number;
+
+    getTVSeason(id, seasonNum)
+      .then(data => {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const upcoming = (data.episodes || []).filter(ep => {
+          if (!ep.air_date) return false;
+          return parseLocalDate(ep.air_date) >= today;
+        });
+        setUpcomingEps(upcoming);
+      })
+      .catch(console.error);
+  }, [show, id]);
 
   if (loading) return <DetailsSkeleton />;
   if (!show) return (
@@ -192,20 +276,22 @@ export default function SeriesDetails() {
     </div>
   );
 
-  const backdrop  = backdropUrl(show.backdrop_path, 'original');
-  const poster    = posterUrl(show.poster_path, 'w500');
-  const firstAir  = show.first_air_date?.slice(0, 4);
-  const lastAir   = show.last_air_date?.slice(0, 4);
-  const yearRange = firstAir ? (show.status === 'Ended' && lastAir !== firstAir ? `${firstAir}–${lastAir}` : firstAir) : null;
-  const cast      = show.credits?.cast?.slice(0, 12) || [];
-  const similar   = [...(show.similar?.results || []), ...(show.recommendations?.results || [])].slice(0, 12);
-  const trailer   = show.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
-  const genres    = show.genres || [];
-  const creators  = show.created_by || [];
+  const backdrop     = backdropUrl(show.backdrop_path, 'original');
+  const poster       = posterUrl(show.poster_path, 'w500');
+  const firstAir     = show.first_air_date?.slice(0, 4);
+  const lastAir      = show.last_air_date?.slice(0, 4);
+  const yearRange    = firstAir
+    ? (show.status === 'Ended' && lastAir !== firstAir ? `${firstAir}–${lastAir}` : firstAir)
+    : null;
+  const cast         = show.credits?.cast?.slice(0, 12) || [];
+  const similar      = [...(show.similar?.results || []), ...(show.recommendations?.results || [])].slice(0, 12);
+  const trailer      = show.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+  const genres       = show.genres || [];
+  const creators     = show.created_by || [];
   const qualityLinks = getQualityLinks(fbData);
 
   const addedDate = fbData?.added_date?.toDate
-    ? fbData.added_date.toDate().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })
+    ? fbData.added_date.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : null;
 
   const episodesBySeason = episodes.reduce((acc, ep) => {
@@ -213,16 +299,16 @@ export default function SeriesDetails() {
     acc[ep.season].push(ep);
     return acc;
   }, {});
-  const seasonNumbers = Object.keys(episodesBySeason).map(Number).sort((a, b) => a - b);
+  const seasonNumbers  = Object.keys(episodesBySeason).map(Number).sort((a, b) => a - b);
   const availableCount = episodes.filter(e => getQualityLinks(e)).length;
 
-  const handleEpisodeRequest = (ep) => { setReqEpisode({ season: ep.season, episode: ep.episode }); setShowReq(true); };
-  const handleCloseReq = () => { setShowReq(false); setReqEpisode(null); };
+  const handleEpisodeRequest = ep => { setReqEpisode({ season: ep.season, episode: ep.episode }); setShowReq(true); };
+  const handleCloseReq       = ()  => { setShowReq(false); setReqEpisode(null); };
 
   return (
     <div className="min-h-screen pb-16">
 
-      {/* ── HERO ── */}
+      {/* ── HERO ─────────────────────────────────────────────────────── */}
       <div className="relative">
         <div className="absolute inset-0 h-full min-h-[520px]">
           {backdrop && <img src={backdrop} alt="" className="w-full h-full object-cover object-top" />}
@@ -231,16 +317,16 @@ export default function SeriesDetails() {
         </div>
 
         <div className="relative z-10 max-w-screen-xl mx-auto px-4 sm:px-6 pt-28 pb-14">
-          {/* Back */}
           <button onClick={() => navigate(-1)}
             className="flex items-center gap-1.5 text-white/40 hover:text-white text-sm font-body mb-6 transition-colors group">
             <FiArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> Back
           </button>
 
           <div className="flex flex-row gap-7 sm:gap-10 items-start">
-            {/* POSTER */}
+            {/* Poster */}
             <div className="flex-shrink-0 w-28 sm:w-44 md:w-52 lg:w-60">
-              <div className="rounded-2xl overflow-hidden border border-white/10" style={{ boxShadow: '0 24px 72px -8px rgba(0,0,0,0.95)' }}>
+              <div className="rounded-2xl overflow-hidden border border-white/10"
+                style={{ boxShadow: '0 24px 72px -8px rgba(0,0,0,0.95)' }}>
                 {poster
                   ? <img src={poster} alt={show.name} className="w-full block" />
                   : <div className="aspect-[2/3] bg-dark-700 flex items-center justify-center text-4xl">📺</div>
@@ -248,21 +334,34 @@ export default function SeriesDetails() {
               </div>
             </div>
 
-            {/* INFO */}
+            {/* Info */}
             <div className="flex-1 min-w-0 space-y-3 sm:space-y-4 pt-1 sm:pt-3">
 
-              {/* ✅ FIX 1: Badge based on fbData, not qualityLinks/episodes length */}
+              {/* ── Badges ── */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="tag-brand text-xs">📺 SERIES</span>
+
+                {/* Available / Not Available — based on fbData presence */}
                 {fbData ? (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-green-900/40 text-green-400 border border-green-700/40">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold
+                                   bg-green-900/40 text-green-400 border border-green-700/40">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                     Available
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-gray-800/60 text-gray-400 border border-gray-600/40">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold
+                                   bg-gray-800/60 text-gray-400 border border-gray-600/40">
                     <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                     Not Available
+                  </span>
+                )}
+
+                {/* Upcoming pill */}
+                {upcomingEps.length > 0 && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold
+                                   bg-brand-900/60 text-brand-300 border border-brand-700/40">
+                    <FiClock size={9} className="animate-pulse" />
+                    {upcomingEps.length} upcoming
                   </span>
                 )}
               </div>
@@ -309,33 +408,26 @@ export default function SeriesDetails() {
                 </p>
               )}
 
-              {/* ✅ FIX 2: Request button removed from here — moved to content panel below */}
+              {/* CTAs — request button lives in the panel below */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 {episodes.length > 0 && (
-                  <button
-                    onClick={() => {
-                      document.getElementById('episodes-section')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="btn-brand text-sm"
-                  >
-                    <FiTv size={13} /> Browse Episodes
-                  </button>
+                  <button onClick={() => document.getElementById('episodes-section')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="btn-brand text-sm"><FiTv size={13} /> Browse Episodes</button>
                 )}
-
+                {upcomingEps.length > 0 && episodes.length === 0 && (
+                  <button onClick={() => document.getElementById('upcoming-section')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="btn-brand text-sm"><FiClock size={13} /> Upcoming Episodes</button>
+                )}
                 {trailer && (
                   <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
                     className="btn-ghost glass border border-white/15 text-sm">
                     <FiPlay size={12}/> Trailer
                   </a>
                 )}
-
-                <button
-                  onClick={toggleSaved}
+                <button onClick={toggleSaved}
                   className={`btn-ghost p-2.5 rounded-xl border transition-all duration-200 ${
                     saved ? 'border-red-500/50 text-red-400 bg-red-900/20' : 'border-white/10 text-white/40 hover:text-white'
-                  }`}
-                  title={saved ? 'Remove from watchlist' : 'Add to watchlist'}
-                >
+                  }`} title={saved ? 'Remove from watchlist' : 'Add to watchlist'}>
                   <FiHeart size={16} className={saved ? 'fill-red-400' : ''} />
                 </button>
               </div>
@@ -344,10 +436,10 @@ export default function SeriesDetails() {
         </div>
       </div>
 
-      {/* ── CONTENT ── */}
+      {/* ── CONTENT ──────────────────────────────────────────────────── */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 space-y-14 mt-10">
 
-        {/* ✅ FIX 2: "Available on CineLink" panel — shown when fbData exists */}
+        {/* Available on CineLink */}
         {fbData && (qualityLinks || episodes.length > 0) && (
           <div className="glass rounded-2xl p-5 border-l-4 border-brand-500 space-y-4">
             <div className="flex items-center gap-2">
@@ -363,7 +455,8 @@ export default function SeriesDetails() {
               <div className="flex flex-wrap gap-2">
                 {Object.entries(qualityLinks).map(([q, url]) => (
                   <a key={q} href={url} target="_blank" rel="noreferrer noopener"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors">
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl
+                               bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors">
                     <FiDownload size={12} /> {q} <FiExternalLink size={10} className="opacity-60" />
                   </a>
                 ))}
@@ -372,25 +465,54 @@ export default function SeriesDetails() {
           </div>
         )}
 
-        {/* ✅ FIX 2: "Not Available" panel with Request button — shown when not in Firestore */}
+        {/* Not Available — Request button lives here */}
         {!fbData && (
-          <div className="glass rounded-2xl p-5 border-l-4 border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="glass rounded-2xl p-5 border-l-4 border-white/10
+                          flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="text-white/70 font-body font-semibold">Not yet available on CineLink</p>
               <p className="text-white/35 text-sm font-body mt-0.5">
-                Can't find a download link? Send a request and our team will add it.
+                Request this series and our team will add it as soon as possible.
               </p>
             </div>
-            <button
-              onClick={() => { setReqEpisode(null); setShowReq(true); }}
-              className="btn-brand text-sm flex-shrink-0"
-            >
+            <button onClick={() => { setReqEpisode(null); setShowReq(true); }}
+              className="btn-brand text-sm flex-shrink-0">
               <FiMessageSquare size={13} /> Request Series
             </button>
           </div>
         )}
 
-        {/* ── Episodes section ── */}
+        {/* ── Upcoming Episodes ─────────────────────────────────────────── */}
+        {upcomingEps.length > 0 && (
+          <section id="upcoming-section">
+            <div className="flex items-center gap-3 mb-6">
+              {/* Pulsing icon */}
+              <div className="relative w-5 h-5 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full bg-brand-500/20 animate-ping" />
+                <FiClock size={16} className="text-brand-400 relative z-10" />
+              </div>
+              <h2 className="section-title">Upcoming Episodes</h2>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold
+                               bg-brand-900/60 text-brand-300 border border-brand-700/30">
+                {upcomingEps.length}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {upcomingEps.slice(0, 5).map((ep, i) => (
+                <UpcomingEpisodeRow key={ep.id} ep={ep} isNext={i === 0} />
+              ))}
+            </div>
+
+            {upcomingEps.length > 5 && (
+              <p className="text-center text-white/25 text-xs font-body mt-5">
+                +{upcomingEps.length - 5} more episode{upcomingEps.length - 5 > 1 ? 's' : ''} remaining this season
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* ── Available Episodes (Firestore) ────────────────────────────── */}
         {episodes.length > 0 && (
           <section id="episodes-section">
             <div className="flex items-center justify-between mb-2">
@@ -408,7 +530,9 @@ export default function SeriesDetails() {
                 <div className="flex items-center gap-3 mb-4">
                   <FiTv size={15} className="text-brand-400" />
                   <h3 className="font-display text-2xl text-white tracking-wide">Season {season}</h3>
-                  <span className="text-white/25 text-xs font-mono">{episodesBySeason[season].length} ep{episodesBySeason[season].length > 1 ? 's' : ''}</span>
+                  <span className="text-white/25 text-xs font-mono">
+                    {episodesBySeason[season].length} ep{episodesBySeason[season].length > 1 ? 's' : ''}
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {episodesBySeason[season].map(ep => (

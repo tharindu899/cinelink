@@ -14,6 +14,7 @@ const tmdb = axios.create({
 export const posterUrl    = (path, size = 'w500')    => path ? `${IMG_BASE}/${size}${path}` : null;
 export const backdropUrl  = (path, size = 'w1280')   => path ? `${IMG_BASE}/${size}${path}` : null;
 export const profileUrl   = (path, size = 'w185')    => path ? `${IMG_BASE}/${size}${path}` : null;
+export const stillUrl     = (path, size = 'w300')    => path ? `${IMG_BASE}/${size}${path}` : null;
 
 // ── Multi search ──────────────────────────────────────────────────────────────
 export const searchMulti = (query, page = 1) =>
@@ -39,6 +40,10 @@ export const getTVDetails = (id) =>
   tmdb.get(`/tv/${id}`, {
     params: { append_to_response: 'credits,videos,similar,recommendations' },
   }).then(r => r.data);
+
+// ── TV Season (per-episode air dates, stills, overviews) ─────────────────────
+export const getTVSeason = (seriesId, seasonNumber) =>
+  tmdb.get(`/tv/${seriesId}/season/${seasonNumber}`).then(r => r.data);
 
 // ── Trending / Discover ───────────────────────────────────────────────────────
 export const getTrending = (mediaType = 'all', timeWindow = 'week') =>
