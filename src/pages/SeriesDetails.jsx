@@ -6,7 +6,7 @@ import {
   FiMessageSquare, FiAlertCircle, FiDownload,
   FiTv, FiArrowLeft, FiHeart, FiPlay, FiClock,
 } from 'react-icons/fi';
-import { getTVDetails, getTVSeason, backdropUrl, posterUrl, stillUrl } from '../api/tmdb';
+import { getTVDetails, getTVSeason, backdropUrl, posterUrl } from '../api/tmdb';
 import { listenEntry, listenEpisodes } from '../firebase/firestore';
 import CastCard from '../components/CastCard';
 import MovieCard from '../components/MovieCard';
@@ -162,7 +162,7 @@ export default function SeriesDetails() {
   const [loading,     setLoading]     = useState(true);
   const [showReq,     setShowReq]     = useState(false);
   const [reqEpisode,  setReqEpisode]  = useState(null);
-  const [customEpisodeReq, setCustomEpisodeReq] = useState(null); // for requesting any episode
+  const [customEpisodeReq, setCustomEpisodeReq] = useState(null);
   const [saved, toggleSaved]          = useWatchlist(id, 'series');
 
   useEffect(() => {
@@ -176,6 +176,13 @@ export default function SeriesDetails() {
     window.scrollTo(0, 0);
     return () => { unsubFb(); unsubEp(); };
   }, [id]);
+
+  // Clear episodes when series is deleted (fbData becomes null)
+  useEffect(() => {
+    if (fbData === null && episodes.length > 0) {
+      setEpisodes([]);
+    }
+  }, [fbData, episodes.length]);
 
   useEffect(() => {
     if (!show?.next_episode_to_air) { setUpcomingEps([]); return; }
@@ -494,7 +501,7 @@ export default function SeriesDetails() {
           </section>
         )}
 
-        {/* All seasons grid - now includes Request Episode button */}
+        {/* All seasons grid - includes Request Episode button */}
         {show.seasons?.length > 0 && (
           <section>
             <h2 className="section-title mb-6">All Seasons</h2>

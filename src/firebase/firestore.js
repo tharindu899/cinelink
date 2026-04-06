@@ -13,6 +13,7 @@ import {
   query,
   orderBy,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -53,9 +54,21 @@ export async function saveEntry(type, tmdbId, data) {
   }
 }
 
-// ── Delete an entry (admin) ───────────────────────────────────────────────────
+// ── Delete an entry (admin) – cascade delete for series episodes ──────────────
+async function deleteSeriesEpisodes(seriesId) {
+  const episodesRef = collection(db, 'series', String(seriesId), 'episodes');
+  const snapshot = await getDocs(episodesRef);
+  if (snapshot.empty) return;
+  const batch = writeBatch(db);
+  snapshot.docs.forEach(doc => batch.delete(doc.ref));
+  await batch.commit();
+}
+
 export async function deleteEntry(type, tmdbId) {
   const col = type === 'movie' ? COL.movies : COL.series;
+  if (type === 'series') {
+    await deleteSeriesEpisodes(tmdbId);
+  }
   await deleteDoc(doc(db, col, String(tmdbId)));
 }
 
@@ -128,7 +141,7 @@ export async function checkExistingRequest(tmdbId, season = null, episode = null
   if (season != null && episode != null) {
     key = `${tmdbId}_s${season}e${episode}`;
   } else if (season != null && episode == null) {
-    key = `${tmdbId}_s${season}`;   // season‑only key
+    key = `${tmdbId}_s${season}`;
   } else {
     key = String(tmdbId);
   }
