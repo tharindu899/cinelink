@@ -12,6 +12,7 @@ import {
   FiArrowLeft,
   FiHeart,
   FiPlay,
+  FiFileText,
 } from "react-icons/fi";
 import { getMovieDetails, backdropUrl, posterUrl } from "../api/tmdb";
 import { getEntry } from "../firebase/firestore";
@@ -153,10 +154,15 @@ export default function MovieDetails() {
     : null;
   const year = movie.release_date?.slice(0, 4);
   const cast = movie.credits?.cast?.slice(0, 12) || [];
+  const seenIds = new Set();
   const similar = [
     ...(movie.similar?.results || []),
     ...(movie.recommendations?.results || []),
-  ].slice(0, 12);
+  ].filter(item => {
+    if (seenIds.has(item.id)) return false;
+    seenIds.add(item.id);
+    return true;
+  }).slice(0, 12);
   const trailer = movie.videos?.results?.find(
     (v) => v.type === "Trailer" && v.site === "YouTube",
   );
@@ -350,6 +356,30 @@ export default function MovieDetails() {
                 ))}
               </div>
             </div>
+
+            {/* Subtitle links */}
+            {fbData.subtitles && Object.keys(fbData.subtitles).some(k => fbData.subtitles[k]) && (
+              <div className="space-y-2 pt-1">
+                <p className="text-xs text-white/30 font-mono uppercase tracking-wider flex items-center gap-1.5">
+                  <FiFileText size={11} /> Subtitles
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(fbData.subtitles)
+                    .filter(([, url]) => url)
+                    .map(([lang, url]) => (
+                      <a key={lang} href={url} target="_blank" rel="noreferrer noopener"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                                   bg-blue-900/40 hover:bg-blue-800/60 text-blue-300
+                                   text-xs font-semibold border border-blue-700/40 transition-colors">
+                        <FiFileText size={10} />
+                        {lang}
+                        <FiExternalLink size={9} className="opacity-60" />
+                      </a>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
           </div>
         )}
 
