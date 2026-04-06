@@ -5,6 +5,7 @@ import {
   FiStar, FiCalendar, FiExternalLink,
   FiMessageSquare, FiAlertCircle, FiDownload,
   FiTv, FiArrowLeft, FiHeart, FiPlay, FiClock,
+  FiFileText,
 } from 'react-icons/fi';
 import { getTVDetails, getTVSeason, backdropUrl, posterUrl } from '../api/tmdb';
 import { listenEntry, listenEpisodes } from '../firebase/firestore';
@@ -131,15 +132,34 @@ function EpisodeCard({ ep, onRequestEpisode }) {
       </div>
       {ep.title && <p className="text-white text-sm font-body font-medium leading-snug mb-2 line-clamp-2">{ep.title}</p>}
       {ep.note  && <p className="text-white/40 text-xs font-mono mb-3 truncate">{ep.note}</p>}
-      {hasLink
-        ? <EpisodeDownloadLinks qualityLinks={qualityLinks} />
-        : <button onClick={onRequestEpisode}
-            className="inline-flex items-center gap-1.5 bg-dark-600 hover:bg-dark-500
-                       text-white/60 hover:text-white text-xs px-3 py-1.5 rounded-lg
-                       border border-white/10 hover:border-white/20 transition-all">
-            <FiMessageSquare size={10} /> Request
-          </button>
-      }
+      
+      {hasLink && <EpisodeDownloadLinks qualityLinks={qualityLinks} />}
+
+      {/* Episode subtitle links */}
+      {ep.subtitles && Object.values(ep.subtitles).some(Boolean) && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {Object.entries(ep.subtitles)
+            .filter(([, url]) => url)
+            .map(([lang, url]) => (
+              <a key={lang} href={url} target="_blank" rel="noreferrer noopener"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg
+                           bg-blue-900/40 hover:bg-blue-800/60 text-blue-300
+                           text-[10px] font-mono font-semibold border border-blue-700/40 transition-colors">
+                <FiFileText size={9} /> {lang}
+              </a>
+            ))
+          }
+        </div>
+      )}
+
+      {!hasLink && (
+        <button onClick={onRequestEpisode}
+          className="inline-flex items-center gap-1.5 bg-dark-600 hover:bg-dark-500
+                     text-white/60 hover:text-white text-xs px-3 py-1.5 rounded-lg
+                     border border-white/10 hover:border-white/20 transition-all">
+          <FiMessageSquare size={10} /> Request
+        </button>
+      )}
     </div>
   );
 }
@@ -219,7 +239,10 @@ export default function SeriesDetails() {
     ? (show.status === 'Ended' && lastAir !== firstAir ? `${firstAir}–${lastAir}` : firstAir)
     : null;
   const cast         = show.credits?.cast?.slice(0, 12) || [];
-  const similar      = [...(show.similar?.results || []), ...(show.recommendations?.results || [])].slice(0, 12);
+  const seenIds = new Set();
+  const similar = [...(show.similar?.results || []), ...(show.recommendations?.results || [])]
+    .filter(item => { if (seenIds.has(item.id)) return false; seenIds.add(item.id); return true; })
+    .slice(0, 12);
   const trailer      = show.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
   const genres       = show.genres || [];
   const creators     = show.created_by || [];
@@ -383,6 +406,30 @@ export default function SeriesDetails() {
                     <FiDownload size={12} /> {q} <FiExternalLink size={10} className="opacity-60" />
                   </a>
                 ))}
+              </div>
+            )}
+
+            {/* Series-level subtitle links */}
+            {fbData.subtitles && Object.values(fbData.subtitles).some(Boolean) && (
+              <div className="space-y-2 pt-1">
+                <p className="text-xs text-white/30 font-mono uppercase tracking-wider flex items-center gap-1.5">
+                  <FiFileText size={11} /> Subtitles
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(fbData.subtitles)
+                    .filter(([, url]) => url)
+                    .map(([lang, url]) => (
+                      <a key={lang} href={url} target="_blank" rel="noreferrer noopener"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                                   bg-blue-900/40 hover:bg-blue-800/60 text-blue-300
+                                   text-xs font-semibold border border-blue-700/40 transition-colors">
+                        <FiFileText size={10} />
+                        {lang}
+                        <FiExternalLink size={9} className="opacity-60" />
+                      </a>
+                    ))
+                  }
+                </div>
               </div>
             )}
           </div>
