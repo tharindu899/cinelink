@@ -291,17 +291,8 @@ export default function MovieDetails() {
                 </p>
               )}
 
-              {/* ── Single CTA: Download OR Request ── */}
+              {/* ── CTA Buttons (only trailer & watchlist - request moved to panel) ── */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
-                {!qualityLinks && (
-                  <button
-                    onClick={() => setShowReq(true)}
-                    className="btn-brand text-sm"
-                  >
-                    <FiMessageSquare size={13} /> Request Movie
-                  </button>
-                )}
-
                 {trailer && (
                   <a
                     href={`https://www.youtube.com/watch?v=${trailer.key}`}
@@ -331,7 +322,7 @@ export default function MovieDetails() {
 
       {/* ── CONTENT BELOW HERO ── */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 space-y-14 mt-10">
-        {/* Firebase availability panel */}
+        {/* Firebase availability panel (when movie available) */}
         {fbData && qualityLinks && (
           <div className="glass rounded-2xl p-5 border-l-4 border-brand-500 space-y-4">
             <div className="flex items-center gap-2">
@@ -376,6 +367,23 @@ export default function MovieDetails() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Not Available panel - matches series style */}
+        {!fbData && (
+          <div className="glass rounded-2xl p-5 border-l-4 border-white/10
+                          flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-white/70 font-body font-semibold">Not yet available on CineLink</p>
+              <p className="text-white/35 text-sm font-body mt-0.5">
+                Request this movie and our team will add it as soon as possible.
+              </p>
+            </div>
+            <button onClick={() => setShowReq(true)}
+              className="btn-brand text-sm flex-shrink-0">
+              <FiMessageSquare size={13} /> Request Movie
+            </button>
           </div>
         )}
 

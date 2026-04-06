@@ -19,125 +19,67 @@ function parseLocalDate(str) {
   return new Date(y, m - 1, d);
 }
 
-// ── Live countdown clock ──────────────────────────────────────────────────────
-function CountdownTimer({ airDate }) {
-  const tick = () => {
-    const diff = parseLocalDate(airDate) - Date.now();
-    if (diff <= 0) return null;
-    return {
-      days:    Math.floor(diff / 86400000),
-      hours:   Math.floor((diff % 86400000) / 3600000),
-      minutes: Math.floor((diff % 3600000)  / 60000),
-      seconds: Math.floor((diff % 60000)    / 1000),
-    };
-  };
-
-  const [t, setT] = useState(tick);
-
-  useEffect(() => {
-    const id = setInterval(() => setT(tick()), 1000);
-    return () => clearInterval(id);
-  }, [airDate]); // eslint-disable-line
-
-  /* Already airing today */
-  if (!t) {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                       bg-green-900/40 text-green-400 text-xs font-mono font-semibold
-                       border border-green-700/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-        Airing Today
-      </span>
-    );
-  }
-
-  const units = [
-    { label: 'DAYS', value: t.days    },
-    { label: 'HRS',  value: t.hours   },
-    { label: 'MIN',  value: t.minutes },
-    { label: 'SEC',  value: t.seconds },
-  ];
-
-  return (
-    <div className="flex items-end gap-1">
-      {units.map(({ label, value }, i) => (
-        <div key={label} className="flex items-end gap-1">
-          {/* digit box */}
-          <div className="flex flex-col items-center">
-            <div className="w-11 h-11 rounded-xl bg-dark-900 border border-white/10
-                            flex items-center justify-center relative overflow-hidden
-                            shadow-inner shadow-black/50">
-              <div className="absolute inset-x-0 top-0 h-px bg-white/8" />
-              <div className="absolute inset-x-0 bottom-0 h-px bg-black/30" />
-              <span className="font-mono font-bold text-lg text-white relative z-10 tabular-nums">
-                {String(value).padStart(2, '0')}
-              </span>
-            </div>
-            <span className="text-white/25 text-[8px] font-mono tracking-widest mt-1">{label}</span>
-          </div>
-          {/* colon separator */}
-          {i < units.length - 1 && (
-            <span className="text-brand-500/70 font-mono font-bold text-base mb-[18px] leading-none">:</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+// ── Compact countdown text (no banner/boxes) ──────────────────────────────────
+function getCompactCountdown(airDate) {
+  const diff = parseLocalDate(airDate) - Date.now();
+  if (diff <= 0) return null;
+  
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  
+  if (days > 0) return `in ${days}d ${hours}h`;
+  if (hours > 0) return `in ${hours}h ${minutes}m`;
+  return `in ${minutes}m`;
 }
 
-// ── Upcoming episode row ──────────────────────────────────────────────────────
+// ── Upcoming episode row (compact version, no banner) ─────────────────────────
 function UpcomingEpisodeRow({ ep, isNext }) {
   const label = `S${String(ep.season_number).padStart(2,'0')} E${String(ep.episode_number).padStart(2,'0')}`;
   const still = stillUrl(ep.still_path, 'w300');
   const airFormatted = parseLocalDate(ep.air_date).toLocaleDateString('en-US', {
     weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
   });
+  const countdownText = getCompactCountdown(ep.air_date);
 
   return (
-    <div className={`flex flex-col sm:flex-row gap-4 p-4 rounded-2xl border transition-colors ${
-      isNext ? 'bg-brand-950/60 border-brand-500/25' : 'bg-dark-800/40 border-white/5'
+    <div className={`flex flex-col sm:flex-row gap-3 p-3 rounded-xl border transition-colors ${
+      isNext ? 'bg-brand-950/40 border-brand-500/30' : 'bg-dark-800/40 border-white/5'
     }`}>
       {/* Still image */}
-      <div className="flex-shrink-0 w-full sm:w-40 h-24 sm:h-[4.5rem] rounded-xl overflow-hidden bg-dark-700 border border-white/5">
+      <div className="flex-shrink-0 w-full sm:w-32 h-20 sm:h-[4rem] rounded-lg overflow-hidden bg-dark-700 border border-white/5">
         {still
           ? <img src={still} alt={ep.name} className="w-full h-full object-cover" loading="lazy" />
-          : <div className="w-full h-full flex items-center justify-center text-white/15"><FiTv size={22} /></div>
+          : <div className="w-full h-full flex items-center justify-center text-white/15"><FiTv size={18} /></div>
         }
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0 flex flex-col justify-between gap-1.5">
+      <div className="flex-1 min-w-0 flex flex-col justify-between gap-1">
         <div>
-          <div className="flex items-center gap-2 flex-wrap mb-1">
+          <div className="flex items-center gap-2 flex-wrap mb-0.5">
             <span className="font-mono text-xs font-semibold text-brand-400">{label}</span>
             {isNext && (
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold
-                               bg-brand-600 text-white tracking-wide">NEXT UP</span>
-            )}
-            {ep.runtime > 0 && (
-              <span className="flex items-center gap-1 text-white/30 text-[11px] font-body">
-                <FiClock size={9} /> {ep.runtime}m
-              </span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold
+                               bg-brand-600 text-white tracking-wide">NEXT</span>
             )}
           </div>
           <p className="text-white font-body font-semibold text-sm line-clamp-1">
             {ep.name || `Episode ${ep.episode_number}`}
           </p>
-          {ep.overview && (
-            <p className="text-white/35 text-xs font-body mt-0.5 line-clamp-2 leading-relaxed hidden sm:block">
-              {ep.overview}
-            </p>
+        </div>
+        <div className="flex items-center gap-3 text-white/40 text-[10px] font-body">
+          <span className="flex items-center gap-1">
+            <FiCalendar size={9} className="text-brand-400/60" />
+            {airFormatted}
+          </span>
+          {countdownText && (
+            <span className="flex items-center gap-1">
+              <FiClock size={9} className="text-brand-400/60" />
+              {countdownText}
+            </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-white/40 text-[11px] font-body">
-          <FiCalendar size={10} className="text-brand-400/60" />
-          {airFormatted}
-        </div>
-      </div>
-
-      {/* Countdown */}
-      <div className="flex-shrink-0 flex items-center sm:items-end">
-        <CountdownTimer airDate={ep.air_date} />
       </div>
     </div>
   );
@@ -356,11 +298,10 @@ export default function SeriesDetails() {
                   </span>
                 )}
 
-                {/* Upcoming pill */}
+                {/* Upcoming pill - compact count */}
                 {upcomingEps.length > 0 && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold
+                  <span className="px-2 py-0.5 rounded-full text-xs font-mono font-semibold
                                    bg-brand-900/60 text-brand-300 border border-brand-700/40">
-                    <FiClock size={9} className="animate-pulse" />
                     {upcomingEps.length} upcoming
                   </span>
                 )}
@@ -408,7 +349,7 @@ export default function SeriesDetails() {
                 </p>
               )}
 
-              {/* CTAs — request button lives in the panel below */}
+              {/* CTAs */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 {episodes.length > 0 && (
                   <button onClick={() => document.getElementById('episodes-section')?.scrollIntoView({ behavior: 'smooth' })}
@@ -482,31 +423,27 @@ export default function SeriesDetails() {
           </div>
         )}
 
-        {/* ── Upcoming Episodes ─────────────────────────────────────────── */}
+        {/* ── Upcoming Episodes (compact, no banner) ─────────────────────────── */}
         {upcomingEps.length > 0 && (
           <section id="upcoming-section">
-            <div className="flex items-center gap-3 mb-6">
-              {/* Pulsing icon */}
-              <div className="relative w-5 h-5 flex items-center justify-center">
-                <span className="absolute inset-0 rounded-full bg-brand-500/20 animate-ping" />
-                <FiClock size={16} className="text-brand-400 relative z-10" />
-              </div>
+            <div className="flex items-center gap-2 mb-5">
+              <FiClock size={14} className="text-brand-400" />
               <h2 className="section-title">Upcoming Episodes</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-semibold
                                bg-brand-900/60 text-brand-300 border border-brand-700/30">
                 {upcomingEps.length}
               </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {upcomingEps.slice(0, 5).map((ep, i) => (
                 <UpcomingEpisodeRow key={ep.id} ep={ep} isNext={i === 0} />
               ))}
             </div>
 
             {upcomingEps.length > 5 && (
-              <p className="text-center text-white/25 text-xs font-body mt-5">
-                +{upcomingEps.length - 5} more episode{upcomingEps.length - 5 > 1 ? 's' : ''} remaining this season
+              <p className="text-center text-white/25 text-xs font-body mt-4">
+                +{upcomingEps.length - 5} more episode{upcomingEps.length - 5 > 1 ? 's' : ''} remaining
               </p>
             )}
           </section>
@@ -515,22 +452,29 @@ export default function SeriesDetails() {
         {/* ── Available Episodes (Firestore) ────────────────────────────── */}
         {episodes.length > 0 && (
           <section id="episodes-section">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="section-title">Watch Episodes</h2>
-              <div className="flex items-center gap-4 text-xs text-white/40">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400" /> Available</span>
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-white/20" /> Not available</span>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+              <div className="flex items-center gap-3">
+                <h2 className="section-title">Watch Episodes</h2>
+                {/* Compact available/total label */}
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold
+                                 bg-brand-900/50 text-brand-300 border border-brand-700/40">
+                  {availableCount}/{episodes.length} available
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-[10px] text-white/40">
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Available</span>
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-white/20" /> Not available</span>
               </div>
             </div>
-            <p className="text-white/35 text-sm font-body mb-8">
-              {availableCount} of {episodes.length} episodes available
+            <p className="text-white/35 text-xs font-body mb-6">
+              {availableCount} of {episodes.length} episodes ready to watch
             </p>
             {seasonNumbers.map(season => (
-              <div key={season} className="mb-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <FiTv size={15} className="text-brand-400" />
-                  <h3 className="font-display text-2xl text-white tracking-wide">Season {season}</h3>
-                  <span className="text-white/25 text-xs font-mono">
+              <div key={season} className="mb-8">
+                <div className="flex items-center gap-2 mb-3">
+                  <FiTv size={14} className="text-brand-400" />
+                  <h3 className="font-display text-xl text-white tracking-wide">Season {season}</h3>
+                  <span className="text-white/25 text-[10px] font-mono">
                     {episodesBySeason[season].length} ep{episodesBySeason[season].length > 1 ? 's' : ''}
                   </span>
                 </div>
