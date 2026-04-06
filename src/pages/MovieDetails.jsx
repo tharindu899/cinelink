@@ -359,10 +359,6 @@ export default function MovieDetails() {
 
             {/* Subtitle links */}
             {fbData.subtitles && Object.keys(fbData.subtitles).some(k => fbData.subtitles[k]) && (
-              <div className="space-y-2 pt-1">
-                <p className="text-xs text-white/30 font-mono uppercase tracking-wider flex items-center gap-1.5">
-                  <FiFileText size={11} /> Subtitles
-                </p>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(fbData.subtitles)
                     .filter(([, url]) => url)
