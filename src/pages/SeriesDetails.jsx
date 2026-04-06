@@ -7,7 +7,8 @@ import {
   FiTv, FiArrowLeft, FiHeart, FiPlay,
 } from 'react-icons/fi';
 import { getTVDetails, backdropUrl, posterUrl } from '../api/tmdb';
-import { getEntry, getEpisodes } from '../firebase/firestore';
+// ✅ FIX 3: Use real-time listeners instead of one-time fetches
+import { listenEntry, listenEpisodes } from '../firebase/firestore';
 import CastCard from '../components/CastCard';
 import MovieCard from '../components/MovieCard';
 import RequestModal from '../components/RequestModal';
@@ -64,12 +65,9 @@ function DownloadButton({ qualityLinks, size = 'sm' }) {
 
 function QualityBadges({ qualityLinks }) {
   if (!qualityLinks) return null;
-
-  const qualities = Object.keys(qualityLinks);
-
   return (
     <div className="flex flex-wrap gap-1.5">
-      {qualities.map(q => (
+      {Object.keys(qualityLinks).map(q => (
         <span
           key={q}
           className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-green-900/40 text-green-400 border border-green-700/40"
@@ -162,24 +160,25 @@ export default function SeriesDetails() {
   const [reqEpisode, setReqEpisode] = useState(null);
   const [saved, toggleSaved]        = useWatchlist(id, 'series');
 
+  // ✅ FIX 3: Real-time listeners — deleted links/episodes reflect immediately
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setShow(null); setFbData(null); setEpisodes([]);
-      try {
-        const [tmdbData, firebaseData, episodeData] = await Promise.all([
-          getTVDetails(id),
-          getEntry('series', id),
-          getEpisodes(id),
-        ]);
-        setShow(tmdbData);
-        setFbData(firebaseData);
-        setEpisodes(episodeData);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    };
-    load();
+    setLoading(true);
+    setShow(null);
+    setFbData(null);
+    setEpisodes([]);
+
+    // TMDb is a one-time fetch (external API, no real-time needed)
+    getTVDetails(id)
+      .then(setShow)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+
+    // Firestore uses real-time listeners so changes (add/edit/delete) are live
+    const unsubFb = listenEntry('series', id, setFbData);
+    const unsubEp = listenEpisodes(id, setEpisodes);
+
     window.scrollTo(0, 0);
+    return () => { unsubFb(); unsubEp(); };
   }, [id]);
 
   if (loading) return <DetailsSkeleton />;
@@ -251,16 +250,18 @@ export default function SeriesDetails() {
 
             {/* INFO */}
             <div className="flex-1 min-w-0 space-y-3 sm:space-y-4 pt-1 sm:pt-3">
+
+              {/* ✅ FIX 1: Badge based on fbData, not qualityLinks/episodes length */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="tag-brand text-xs">📺 SERIES</span>
-                {(qualityLinks || episodes.length > 0) ? (
+                {fbData ? (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-green-900/40 text-green-400 border border-green-700/40">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                     Available
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold bg-gray-800/60 text-gray-400 border border-gray-600/40">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                     Not Available
                   </span>
                 )}
@@ -308,36 +309,26 @@ export default function SeriesDetails() {
                 </p>
               )}
 
-              {/* ── Single CTA: Download OR Request ── */}
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  {!qualityLinks && episodes.length === 0 && (
-                    <button
-                      onClick={() => { setReqEpisode(null); setShowReq(true); }}
-                      className="btn-brand text-sm"
-                    >
-                      <FiMessageSquare size={13} /> Request Series
-                    </button>
-                  )}
-                
-                  {!qualityLinks && episodes.length > 0 && (
-                    <button
-                      onClick={() => {
-                        const el = document.getElementById('episodes-section');
-                        el?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className="btn-brand text-sm"
-                    >
-                      <FiTv size={13} /> Browse Episodes
-                    </button>
-                  )}
-                
-                  {trailer && (
-                    <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
-                      className="btn-ghost glass border border-white/15 text-sm">
-                      <FiPlay size={12}/> Trailer
-                    </a>
-                  )}
-                  
+              {/* ✅ FIX 2: Request button removed from here — moved to content panel below */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                {episodes.length > 0 && (
+                  <button
+                    onClick={() => {
+                      document.getElementById('episodes-section')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="btn-brand text-sm"
+                  >
+                    <FiTv size={13} /> Browse Episodes
+                  </button>
+                )}
+
+                {trailer && (
+                  <a href={`https://www.youtube.com/watch?v=${trailer.key}`} target="_blank" rel="noreferrer"
+                    className="btn-ghost glass border border-white/15 text-sm">
+                    <FiPlay size={12}/> Trailer
+                  </a>
+                )}
+
                 <button
                   onClick={toggleSaved}
                   className={`btn-ghost p-2.5 rounded-xl border transition-all duration-200 ${
@@ -356,7 +347,7 @@ export default function SeriesDetails() {
       {/* ── CONTENT ── */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 space-y-14 mt-10">
 
-        {/* Availability panel */}
+        {/* ✅ FIX 2: "Available on CineLink" panel — shown when fbData exists */}
         {fbData && (qualityLinks || episodes.length > 0) && (
           <div className="glass rounded-2xl p-5 border-l-4 border-brand-500 space-y-4">
             <div className="flex items-center gap-2">
@@ -378,6 +369,24 @@ export default function SeriesDetails() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ✅ FIX 2: "Not Available" panel with Request button — shown when not in Firestore */}
+        {!fbData && (
+          <div className="glass rounded-2xl p-5 border-l-4 border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-white/70 font-body font-semibold">Not yet available on CineLink</p>
+              <p className="text-white/35 text-sm font-body mt-0.5">
+                Can't find a download link? Send a request and our team will add it.
+              </p>
+            </div>
+            <button
+              onClick={() => { setReqEpisode(null); setShowReq(true); }}
+              className="btn-brand text-sm flex-shrink-0"
+            >
+              <FiMessageSquare size={13} /> Request Series
+            </button>
           </div>
         )}
 
@@ -454,7 +463,13 @@ export default function SeriesDetails() {
       </div>
 
       {showReq && (
-        <RequestModal item={show} type="series" season={reqEpisode?.season ?? null} episode={reqEpisode?.episode ?? null} onClose={handleCloseReq} />
+        <RequestModal
+          item={show}
+          type="series"
+          season={reqEpisode?.season ?? null}
+          episode={reqEpisode?.episode ?? null}
+          onClose={handleCloseReq}
+        />
       )}
     </div>
   );

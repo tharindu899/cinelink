@@ -18,12 +18,20 @@ import { db } from './config';
 
 const COL = { movies: 'movies', series: 'series', requests: 'requests' };
 
-// ── Get a single entry ────────────────────────────────────────────────────────
+// ── Get a single entry (one-time) ─────────────────────────────────────────────
 export async function getEntry(type, tmdbId) {
   const col  = type === 'movie' ? COL.movies : COL.series;
   const ref  = doc(db, col, String(tmdbId));
   const snap = await getDoc(ref);
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// ── Real-time listener for a single entry ─────────────────────────────────────
+export function listenEntry(type, tmdbId, callback) {
+  const col = type === 'movie' ? COL.movies : COL.series;
+  return onSnapshot(doc(db, col, String(tmdbId)), snap => {
+    callback(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+  });
 }
 
 // ── Save / update an entry (admin) ────────────────────────────────────────────
