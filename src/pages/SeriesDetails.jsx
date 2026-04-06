@@ -33,53 +33,40 @@ function getCompactCountdown(airDate) {
   return `in ${minutes}m`;
 }
 
-// ── Upcoming episode row (compact version, no banner) ─────────────────────────
+// ── Upcoming episode row (compact text-only, no poster) ─────────────────────────
 function UpcomingEpisodeRow({ ep, isNext }) {
   const label = `S${String(ep.season_number).padStart(2,'0')} E${String(ep.episode_number).padStart(2,'0')}`;
-  const still = stillUrl(ep.still_path, 'w300');
   const airFormatted = parseLocalDate(ep.air_date).toLocaleDateString('en-US', {
     weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
   });
   const countdownText = getCompactCountdown(ep.air_date);
 
   return (
-    <div className={`flex flex-col sm:flex-row gap-3 p-3 rounded-xl border transition-colors ${
+    <div className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-colors ${
       isNext ? 'bg-brand-950/40 border-brand-500/30' : 'bg-dark-800/40 border-white/5'
     }`}>
-      {/* Still image */}
-      <div className="flex-shrink-0 w-full sm:w-32 h-20 sm:h-[4rem] rounded-lg overflow-hidden bg-dark-700 border border-white/5">
-        {still
-          ? <img src={still} alt={ep.name} className="w-full h-full object-cover" loading="lazy" />
-          : <div className="w-full h-full flex items-center justify-center text-white/15"><FiTv size={18} /></div>
-        }
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0 flex flex-col justify-between gap-1">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <span className="font-mono text-xs font-semibold text-brand-400">{label}</span>
-            {isNext && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold
-                               bg-brand-600 text-white tracking-wide">NEXT</span>
-            )}
-          </div>
-          <p className="text-white font-body font-semibold text-sm line-clamp-1">
-            {ep.name || `Episode ${ep.episode_number}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 text-white/40 text-[10px] font-body">
-          <span className="flex items-center gap-1">
-            <FiCalendar size={9} className="text-brand-400/60" />
-            {airFormatted}
+      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+        <span className="font-mono text-xs font-semibold text-brand-400 whitespace-nowrap">{label}</span>
+        <p className="text-white font-body font-medium text-sm truncate">
+          {ep.name || `Episode ${ep.episode_number}`}
+        </p>
+        {isNext && (
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-brand-600 text-white whitespace-nowrap">
+            NEXT
           </span>
-          {countdownText && (
-            <span className="flex items-center gap-1">
-              <FiClock size={9} className="text-brand-400/60" />
-              {countdownText}
-            </span>
-          )}
-        </div>
+        )}
+      </div>
+      <div className="flex items-center gap-2 text-white/50 text-[10px] font-body whitespace-nowrap">
+        <span className="flex items-center gap-1">
+          <FiCalendar size={9} className="text-brand-400/60" />
+          {airFormatted}
+        </span>
+        {countdownText && (
+          <span className="flex items-center gap-1">
+            <FiClock size={9} className="text-brand-400/60" />
+            {countdownText}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -177,7 +164,6 @@ export default function SeriesDetails() {
   const [reqEpisode,  setReqEpisode]  = useState(null);
   const [saved, toggleSaved]          = useWatchlist(id, 'series');
 
-  /* Real-time Firestore + one-time TMDb fetch */
   useEffect(() => {
     setLoading(true);
     setShow(null); setFbData(null); setEpisodes([]); setUpcomingEps([]);
@@ -190,7 +176,6 @@ export default function SeriesDetails() {
     return () => { unsubFb(); unsubEp(); };
   }, [id]);
 
-  /* Fetch upcoming episodes from TMDb season data once show is loaded */
   useEffect(() => {
     if (!show?.next_episode_to_air) { setUpcomingEps([]); return; }
     const seasonNum = show.next_episode_to_air.season_number;
@@ -249,8 +234,7 @@ export default function SeriesDetails() {
 
   return (
     <div className="min-h-screen pb-16">
-
-      {/* ── HERO ─────────────────────────────────────────────────────── */}
+      {/* HERO */}
       <div className="relative">
         <div className="absolute inset-0 h-full min-h-[520px]">
           {backdrop && <img src={backdrop} alt="" className="w-full h-full object-cover object-top" />}
@@ -265,7 +249,6 @@ export default function SeriesDetails() {
           </button>
 
           <div className="flex flex-row gap-7 sm:gap-10 items-start">
-            {/* Poster */}
             <div className="flex-shrink-0 w-28 sm:w-44 md:w-52 lg:w-60">
               <div className="rounded-2xl overflow-hidden border border-white/10"
                 style={{ boxShadow: '0 24px 72px -8px rgba(0,0,0,0.95)' }}>
@@ -276,14 +259,9 @@ export default function SeriesDetails() {
               </div>
             </div>
 
-            {/* Info */}
             <div className="flex-1 min-w-0 space-y-3 sm:space-y-4 pt-1 sm:pt-3">
-
-              {/* ── Badges ── */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="tag-brand text-xs">📺 SERIES</span>
-
-                {/* Available / Not Available — based on fbData presence */}
                 {fbData ? (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold
                                    bg-green-900/40 text-green-400 border border-green-700/40">
@@ -297,8 +275,6 @@ export default function SeriesDetails() {
                     Not Available
                   </span>
                 )}
-
-                {/* Upcoming pill - compact count */}
                 {upcomingEps.length > 0 && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-mono font-semibold
                                    bg-brand-900/60 text-brand-300 border border-brand-700/40">
@@ -349,7 +325,6 @@ export default function SeriesDetails() {
                 </p>
               )}
 
-              {/* CTAs */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 {episodes.length > 0 && (
                   <button onClick={() => document.getElementById('episodes-section')?.scrollIntoView({ behavior: 'smooth' })}
@@ -377,9 +352,7 @@ export default function SeriesDetails() {
         </div>
       </div>
 
-      {/* ── CONTENT ──────────────────────────────────────────────────── */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 space-y-14 mt-10">
-
         {/* Available on CineLink */}
         {fbData && (qualityLinks || episodes.length > 0) && (
           <div className="glass rounded-2xl p-5 border-l-4 border-brand-500 space-y-4">
@@ -406,7 +379,7 @@ export default function SeriesDetails() {
           </div>
         )}
 
-        {/* Not Available — Request button lives here */}
+        {/* Not Available */}
         {!fbData && (
           <div className="glass rounded-2xl p-5 border-l-4 border-white/10
                           flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -423,7 +396,7 @@ export default function SeriesDetails() {
           </div>
         )}
 
-        {/* ── Upcoming Episodes (compact, no banner) ─────────────────────────── */}
+        {/* Upcoming Episodes (compact, no poster) */}
         {upcomingEps.length > 0 && (
           <section id="upcoming-section">
             <div className="flex items-center gap-2 mb-5">
@@ -434,13 +407,11 @@ export default function SeriesDetails() {
                 {upcomingEps.length}
               </span>
             </div>
-
             <div className="space-y-2">
               {upcomingEps.slice(0, 5).map((ep, i) => (
                 <UpcomingEpisodeRow key={ep.id} ep={ep} isNext={i === 0} />
               ))}
             </div>
-
             {upcomingEps.length > 5 && (
               <p className="text-center text-white/25 text-xs font-body mt-4">
                 +{upcomingEps.length - 5} more episode{upcomingEps.length - 5 > 1 ? 's' : ''} remaining
@@ -449,13 +420,12 @@ export default function SeriesDetails() {
           </section>
         )}
 
-        {/* ── Available Episodes (Firestore) ────────────────────────────── */}
+        {/* Available Episodes */}
         {episodes.length > 0 && (
           <section id="episodes-section">
             <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
               <div className="flex items-center gap-3">
                 <h2 className="section-title">Watch Episodes</h2>
-                {/* Compact available/total label */}
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold
                                  bg-brand-900/50 text-brand-300 border border-brand-700/40">
                   {availableCount}/{episodes.length} available
@@ -469,22 +439,49 @@ export default function SeriesDetails() {
             <p className="text-white/35 text-xs font-body mb-6">
               {availableCount} of {episodes.length} episodes ready to watch
             </p>
-            {seasonNumbers.map(season => (
-              <div key={season} className="mb-8">
-                <div className="flex items-center gap-2 mb-3">
-                  <FiTv size={14} className="text-brand-400" />
-                  <h3 className="font-display text-xl text-white tracking-wide">Season {season}</h3>
-                  <span className="text-white/25 text-[10px] font-mono">
-                    {episodesBySeason[season].length} ep{episodesBySeason[season].length > 1 ? 's' : ''}
-                  </span>
+            {seasonNumbers.map(season => {
+              const seasonEpisodes = episodesBySeason[season];
+              const seasonAvailableCount = seasonEpisodes.filter(ep => getQualityLinks(ep)).length;
+              const isSeasonMissing = seasonAvailableCount === 0 && seasonEpisodes.length > 0;
+
+              return (
+                <div key={season} className="mb-8">
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      <FiTv size={14} className="text-brand-400" />
+                      <h3 className="font-display text-xl text-white tracking-wide">Season {season}</h3>
+                      <span className="text-white/25 text-[10px] font-mono">
+                        {seasonEpisodes.length} ep{seasonEpisodes.length > 1 ? 's' : ''}
+                      </span>
+                      {seasonAvailableCount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-semibold
+                                         bg-green-900/40 text-green-400 border border-green-700/40">
+                          {seasonAvailableCount}/{seasonEpisodes.length} available
+                        </span>
+                      )}
+                    </div>
+                    {isSeasonMissing && (
+                      <button
+                        onClick={() => {
+                          setReqEpisode({ season, episode: null });
+                          setShowReq(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 bg-dark-600 hover:bg-dark-500
+                                   text-white/60 hover:text-white text-[10px] px-2.5 py-1.5 rounded-lg
+                                   border border-white/10 hover:border-white/20 transition-all"
+                      >
+                        <FiMessageSquare size={9} /> Request Season {season}
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {seasonEpisodes.map(ep => (
+                      <EpisodeCard key={ep.id} ep={ep} onRequestEpisode={() => handleEpisodeRequest(ep)} />
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {episodesBySeason[season].map(ep => (
-                    <EpisodeCard key={ep.id} ep={ep} onRequestEpisode={() => handleEpisodeRequest(ep)} />
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </section>
         )}
 

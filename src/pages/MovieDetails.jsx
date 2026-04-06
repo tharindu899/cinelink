@@ -40,7 +40,6 @@ function DownloadButton({ qualityLinks }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Quality pills */}
       {keys.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
           {keys.map((q) => (
@@ -59,7 +58,6 @@ function DownloadButton({ qualityLinks }) {
         </div>
       )}
 
-      {/* Download button */}
       <a
         href={qualityLinks[selected]}
         target="_blank"
@@ -76,9 +74,7 @@ function DownloadButton({ qualityLinks }) {
 
 function QualityBadges({ qualityLinks }) {
   if (!qualityLinks) return null;
-
   const qualities = Object.keys(qualityLinks);
-
   return (
     <div className="flex flex-wrap gap-1.5">
       {qualities.map((q) => (
@@ -194,7 +190,6 @@ export default function MovieDetails() {
         </div>
 
         <div className="relative z-10 max-w-screen-xl mx-auto px-4 sm:px-6 pt-28 pb-14">
-          {/* Back button */}
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-1.5 text-white/40 hover:text-white text-sm font-body mb-6 transition-colors group"
@@ -207,18 +202,13 @@ export default function MovieDetails() {
           </button>
 
           <div className="flex flex-row gap-7 sm:gap-10 items-start">
-            {/* POSTER */}
             <div className="flex-shrink-0 w-28 sm:w-44 md:w-52 lg:w-60">
               <div
                 className="rounded-2xl overflow-hidden border border-white/10"
                 style={{ boxShadow: "0 24px 72px -8px rgba(0,0,0,0.95)" }}
               >
                 {poster ? (
-                  <img
-                    src={poster}
-                    alt={movie.title}
-                    className="w-full block"
-                  />
+                  <img src={poster} alt={movie.title} className="w-full block" />
                 ) : (
                   <div className="aspect-[2/3] bg-dark-700 flex items-center justify-center text-4xl">
                     🎬
@@ -227,7 +217,6 @@ export default function MovieDetails() {
               </div>
             </div>
 
-            {/* INFO */}
             <div className="flex-1 min-w-0 space-y-3 sm:space-y-4 pt-1 sm:pt-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="tag-brand text-xs">🎬 MOVIE</span>
@@ -250,7 +239,6 @@ export default function MovieDetails() {
                 </p>
               )}
 
-              {/* Meta */}
               <div className="flex flex-wrap items-center gap-2">
                 {movie.vote_average > 0 && (
                   <span className="rating-badge">
@@ -291,7 +279,6 @@ export default function MovieDetails() {
                 </p>
               )}
 
-              {/* ── CTA Buttons (only trailer & watchlist - request moved to panel) ── */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 {trailer && (
                   <a
@@ -303,7 +290,6 @@ export default function MovieDetails() {
                     <FiPlay size={12} /> Trailer
                   </a>
                 )}
-
                 <button
                   onClick={toggleSaved}
                   className={`btn-ghost p-2.5 rounded-xl border ${
@@ -320,9 +306,8 @@ export default function MovieDetails() {
         </div>
       </div>
 
-      {/* ── CONTENT BELOW HERO ── */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 space-y-14 mt-10">
-        {/* Firebase availability panel (when movie available) */}
+        {/* Available panel */}
         {fbData && qualityLinks && (
           <div className="glass rounded-2xl p-5 border-l-4 border-brand-500 space-y-4">
             <div className="flex items-center gap-2">
@@ -345,8 +330,6 @@ export default function MovieDetails() {
                 </span>
               )}
             </div>
-
-            {/* Quality links */}
             <div className="space-y-2">
               <p className="text-xs text-white/30 font-mono uppercase tracking-wider">
                 Available Qualities
@@ -370,7 +353,7 @@ export default function MovieDetails() {
           </div>
         )}
 
-        {/* Not Available panel - matches series style */}
+        {/* Not Available panel (matching series style) */}
         {!fbData && (
           <div className="glass rounded-2xl p-5 border-l-4 border-white/10
                           flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -393,17 +376,11 @@ export default function MovieDetails() {
             { label: "Status", value: movie.status },
             {
               label: "Budget",
-              value:
-                movie.budget > 0
-                  ? `$${(movie.budget / 1e6).toFixed(1)}M`
-                  : null,
+              value: movie.budget > 0 ? `$${(movie.budget / 1e6).toFixed(1)}M` : null,
             },
             {
               label: "Revenue",
-              value:
-                movie.revenue > 0
-                  ? `$${(movie.revenue / 1e6).toFixed(1)}M`
-                  : null,
+              value: movie.revenue > 0 ? `$${(movie.revenue / 1e6).toFixed(1)}M` : null,
             },
             { label: "Votes", value: movie.vote_count?.toLocaleString() },
           ]

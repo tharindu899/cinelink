@@ -76,8 +76,6 @@ export function listenEntries(type, callback) {
 }
 
 // ── Episodes subcollection (under series) ─────────────────────────────────────
-// ID format: s01e03 (zero-padded)
-
 export async function getEpisodes(seriesId) {
   const snap = await getDocs(collection(db, 'series', String(seriesId), 'episodes'));
   return snap.docs
@@ -124,12 +122,16 @@ export function listenEpisodes(seriesId, callback) {
   );
 }
 
-// ── Check if a request already exists ────────────────────────────────────────
-// Uses a composite request_key: "tmdbId" or "tmdbId_s1e3" for episode requests
+// ── Check if a request already exists (supports episode & season) ─────────────
 export async function checkExistingRequest(tmdbId, season = null, episode = null) {
-  const key = (season != null && episode != null)
-    ? `${tmdbId}_s${season}e${episode}`
-    : String(tmdbId);
+  let key;
+  if (season != null && episode != null) {
+    key = `${tmdbId}_s${season}e${episode}`;
+  } else if (season != null && episode == null) {
+    key = `${tmdbId}_s${season}`;   // season‑only key
+  } else {
+    key = String(tmdbId);
+  }
 
   const q    = query(collection(db, COL.requests), where('request_key', '==', key));
   const snap = await getDocs(q);
@@ -141,9 +143,14 @@ export async function checkExistingRequest(tmdbId, season = null, episode = null
 // ── Submit a request (public) ─────────────────────────────────────────────────
 export async function submitRequest(data) {
   const { tmdb_id, season, episode } = data;
-  const request_key = (season != null && episode != null)
-    ? `${tmdb_id}_s${season}e${episode}`
-    : String(tmdb_id);
+  let request_key;
+  if (season != null && episode != null) {
+    request_key = `${tmdb_id}_s${season}e${episode}`;
+  } else if (season != null && episode == null) {
+    request_key = `${tmdb_id}_s${season}`;
+  } else {
+    request_key = String(tmdb_id);
+  }
 
   await addDoc(collection(db, COL.requests), {
     ...data,

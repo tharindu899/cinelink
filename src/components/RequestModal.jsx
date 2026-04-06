@@ -1,19 +1,21 @@
 // src/components/RequestModal.jsx
 import { useState, useEffect } from 'react';
-import { FiX, FiSend, FiCheckCircle, FiAlertCircle, FiTv } from 'react-icons/fi';
+import { FiX, FiSend, FiCheckCircle, FiAlertCircle, FiTv, FiLayers } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { submitRequest, checkExistingRequest } from '../firebase/firestore';
 
 export default function RequestModal({ item, type, season = null, episode = null, onClose }) {
-  // idle | checking | already_requested | loading | done
   const [status,   setStatus]   = useState('idle');
   const [existing, setExisting] = useState(null);
 
   const title      = item.title || item.name;
   const isEpisode  = season != null && episode != null;
+  const isSeason   = season != null && episode == null;
   const epLabel    = isEpisode
     ? `S${String(season).padStart(2, '0')} E${String(episode).padStart(2, '0')}`
-    : null;
+    : (isSeason ? `Season ${season}` : null);
+
+  const RequestIcon = isSeason ? FiLayers : FiTv;
 
   useEffect(() => {
     let cancelled = false;
@@ -48,11 +50,11 @@ export default function RequestModal({ item, type, season = null, episode = null
         poster_path:  item.poster_path,
         requested_at: requestedAt,
         ...(isEpisode ? { season, episode } : {}),
+        ...(isSeason  ? { season } : {}),
       };
 
       await submitRequest(requestData);
 
-      // Notify Telegram (best-effort)
       const res = await fetch('/api/telegram', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,6 +64,7 @@ export default function RequestModal({ item, type, season = null, episode = null
           tmdbId: item.id,
           requestedAt,
           ...(isEpisode ? { season, episode } : {}),
+          ...(isSeason  ? { season } : {}),
         }),
       });
       if (!res.ok) console.warn('Telegram notification failed but request was saved.');
@@ -93,7 +96,6 @@ export default function RequestModal({ item, type, season = null, episode = null
           <FiX size={18} />
         </button>
 
-        {/* ── Checking ── */}
         {status === 'checking' && (
           <div className="text-center py-8 space-y-3">
             <span className="w-8 h-8 border-2 border-white/20 border-t-brand-500 rounded-full animate-spin inline-block" />
@@ -101,7 +103,6 @@ export default function RequestModal({ item, type, season = null, episode = null
           </div>
         )}
 
-        {/* ── Already requested ── */}
         {status === 'already_requested' && existing && (
           <div className="space-y-5">
             <div className="flex items-center gap-2">
@@ -144,7 +145,6 @@ export default function RequestModal({ item, type, season = null, episode = null
           </div>
         )}
 
-        {/* ── Done ── */}
         {status === 'done' && (
           <div className="text-center py-6 space-y-4">
             <div className="flex justify-center">
@@ -161,16 +161,17 @@ export default function RequestModal({ item, type, season = null, episode = null
           </div>
         )}
 
-        {/* ── Idle / loading ── */}
         {(status === 'idle' || status === 'loading') && (
           <>
             <h3 className="font-display text-2xl text-white mb-1">
-              {isEpisode ? 'Request This Episode' : 'Request This Title'}
+              {isEpisode ? 'Request This Episode' : (isSeason ? 'Request This Season' : 'Request This Title')}
             </h3>
             <p className="text-white/50 text-sm font-body mb-6">
               {isEpisode
                 ? "Can't find this episode? Send a request and we'll add it."
-                : "Can't find a link? Send a request and we'll add it."}
+                : (isSeason
+                  ? "This season is missing? Send a request and we'll add all episodes."
+                  : "Can't find a link? Send a request and we'll add it.")}
             </p>
 
             <div className="flex items-center gap-3 p-3 rounded-xl bg-dark-700 border border-white/10 mb-6">
@@ -185,7 +186,7 @@ export default function RequestModal({ item, type, season = null, episode = null
                 <p className="font-body font-semibold text-white text-sm">{title}</p>
                 {epLabel && (
                   <div className="flex items-center gap-1.5 mt-1">
-                    <FiTv size={11} className="text-brand-400" />
+                    <RequestIcon size={11} className="text-brand-400" />
                     <span className="text-brand-400 text-xs font-mono font-semibold">{epLabel}</span>
                   </div>
                 )}
