@@ -7,6 +7,7 @@ import { submitRequest, checkExistingRequest } from '../firebase/firestore';
 export default function RequestModal({ item, type, season = null, episode = null, onClose }) {
   const [status,   setStatus]   = useState('idle');
   const [existing, setExisting] = useState(null);
+  const [episodeInput, setEpisodeInput] = useState(episode || 1);
 
   const title      = item.title || item.name;
   const isEpisode  = season != null && episode != null;
@@ -17,12 +18,14 @@ export default function RequestModal({ item, type, season = null, episode = null
 
   const RequestIcon = isSeason ? FiLayers : FiTv;
 
+  // Re-run check when season or episodeInput changes (for custom episode requests)
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
       setStatus('checking');
       try {
-        const found = await checkExistingRequest(item.id, season, episode);
+        const finalEpisode = isSeason ? episodeInput : episode;
+        const found = await checkExistingRequest(item.id, season, finalEpisode);
         if (cancelled) return;
         if (found) {
           setExisting(found);
@@ -36,12 +39,13 @@ export default function RequestModal({ item, type, season = null, episode = null
     };
     check();
     return () => { cancelled = true; };
-  }, [item.id, season, episode]);
+  }, [item.id, season, episode, episodeInput, isSeason]);
 
   const handleRequest = async () => {
     setStatus('loading');
     try {
       const requestedAt = new Date().toISOString();
+      const finalEpisode = isSeason ? episodeInput : episode;
 
       const requestData = {
         tmdb_id:      item.id,
@@ -50,7 +54,7 @@ export default function RequestModal({ item, type, season = null, episode = null
         poster_path:  item.poster_path,
         requested_at: requestedAt,
         ...(isEpisode ? { season, episode } : {}),
-        ...(isSeason  ? { season } : {}),
+        ...(isSeason  ? { season, episode: finalEpisode } : {}),
       };
 
       await submitRequest(requestData);
@@ -64,7 +68,7 @@ export default function RequestModal({ item, type, season = null, episode = null
           tmdbId: item.id,
           requestedAt,
           ...(isEpisode ? { season, episode } : {}),
-          ...(isSeason  ? { season } : {}),
+          ...(isSeason  ? { season, episode: finalEpisode } : {}),
         }),
       });
       if (!res.ok) console.warn('Telegram notification failed but request was saved.');
@@ -164,13 +168,13 @@ export default function RequestModal({ item, type, season = null, episode = null
         {(status === 'idle' || status === 'loading') && (
           <>
             <h3 className="font-display text-2xl text-white mb-1">
-              {isEpisode ? 'Request This Episode' : (isSeason ? 'Request This Season' : 'Request This Title')}
+              {isEpisode ? 'Request This Episode' : (isSeason ? 'Request Episode' : 'Request This Title')}
             </h3>
             <p className="text-white/50 text-sm font-body mb-6">
               {isEpisode
                 ? "Can't find this episode? Send a request and we'll add it."
                 : (isSeason
-                  ? "This season is missing? Send a request and we'll add all episodes."
+                  ? "Enter the episode number you'd like to request."
                   : "Can't find a link? Send a request and we'll add it.")}
             </p>
 
@@ -184,7 +188,23 @@ export default function RequestModal({ item, type, season = null, episode = null
               )}
               <div>
                 <p className="font-body font-semibold text-white text-sm">{title}</p>
-                {epLabel && (
+                {isSeason && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-brand-400 text-xs font-mono font-semibold">Season {season}</span>
+                    <span className="text-white/30">·</span>
+                    <div className="flex items-center gap-1">
+                      <label className="text-white/40 text-[10px] font-mono">Episode</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={episodeInput}
+                        onChange={e => setEpisodeInput(Number(e.target.value))}
+                        className="w-16 bg-dark-800 border border-white/20 rounded px-2 py-0.5 text-white text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+                {epLabel && !isSeason && (
                   <div className="flex items-center gap-1.5 mt-1">
                     <RequestIcon size={11} className="text-brand-400" />
                     <span className="text-brand-400 text-xs font-mono font-semibold">{epLabel}</span>

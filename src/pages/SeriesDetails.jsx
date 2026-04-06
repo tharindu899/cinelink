@@ -162,6 +162,7 @@ export default function SeriesDetails() {
   const [loading,     setLoading]     = useState(true);
   const [showReq,     setShowReq]     = useState(false);
   const [reqEpisode,  setReqEpisode]  = useState(null);
+  const [customEpisodeReq, setCustomEpisodeReq] = useState(null); // for requesting any episode
   const [saved, toggleSaved]          = useWatchlist(id, 'series');
 
   useEffect(() => {
@@ -231,6 +232,7 @@ export default function SeriesDetails() {
 
   const handleEpisodeRequest = ep => { setReqEpisode({ season: ep.season, episode: ep.episode }); setShowReq(true); };
   const handleCloseReq       = ()  => { setShowReq(false); setReqEpisode(null); };
+  const handleCustomEpisodeReq = (season) => { setCustomEpisodeReq({ season, episode: null }); };
 
   return (
     <div className="min-h-screen pb-16">
@@ -462,15 +464,12 @@ export default function SeriesDetails() {
                     </div>
                     {isSeasonMissing && (
                       <button
-                        onClick={() => {
-                          setReqEpisode({ season, episode: null });
-                          setShowReq(true);
-                        }}
+                        onClick={() => handleCustomEpisodeReq(season)}
                         className="inline-flex items-center gap-1.5 bg-dark-600 hover:bg-dark-500
                                    text-white/60 hover:text-white text-[10px] px-2.5 py-1.5 rounded-lg
                                    border border-white/10 hover:border-white/20 transition-all"
                       >
-                        <FiMessageSquare size={9} /> Request Season {season}
+                        <FiMessageSquare size={9} /> Request Episode
                       </button>
                     )}
                   </div>
@@ -495,7 +494,7 @@ export default function SeriesDetails() {
           </section>
         )}
 
-        {/* All seasons grid */}
+        {/* All seasons grid - now includes Request Episode button */}
         {show.seasons?.length > 0 && (
           <section>
             <h2 className="section-title mb-6">All Seasons</h2>
@@ -508,6 +507,12 @@ export default function SeriesDetails() {
                   }
                   <p className="text-white text-xs font-body font-semibold">S{s.season_number}</p>
                   <p className="text-white/40 text-xs">{s.episode_count} eps</p>
+                  <button
+                    onClick={() => handleCustomEpisodeReq(s.season_number)}
+                    className="mt-2 text-[10px] font-mono text-brand-400 hover:text-brand-300 transition-colors flex items-center justify-center gap-1 w-full"
+                  >
+                    <FiMessageSquare size={9} /> Request Episode
+                  </button>
                 </div>
               ))}
             </div>
@@ -527,6 +532,7 @@ export default function SeriesDetails() {
         )}
       </div>
 
+      {/* Request modals */}
       {showReq && (
         <RequestModal
           item={show}
@@ -534,6 +540,16 @@ export default function SeriesDetails() {
           season={reqEpisode?.season ?? null}
           episode={reqEpisode?.episode ?? null}
           onClose={handleCloseReq}
+        />
+      )}
+
+      {customEpisodeReq && (
+        <RequestModal
+          item={show}
+          type="series"
+          season={customEpisodeReq.season}
+          episode={null}
+          onClose={() => setCustomEpisodeReq(null)}
         />
       )}
     </div>
